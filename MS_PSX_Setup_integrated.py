@@ -15,8 +15,12 @@ def setup_psx(user_tags, flight_folder_list, psx, load_photos = True):
     group_dict = {}
     # Regular expression pattern to match the text before "Flight"
     pattern = re.compile(r'(.+?)\s*Flight\s*\d+')
-        
+
     geo_ref_list =[]
+    
+    orig_chunk = doc.chunk
+    chunk = chunk.copy()
+    chunk.label = "Raw_Photos"
     for flight_folder in flight_folder_list:
         # Walk through the subdirectories
         for subdir, dirs, _ in os.walk(flight_folder):

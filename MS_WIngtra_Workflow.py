@@ -131,9 +131,7 @@ import re
 from datetime import datetime
 import argparse
 import copy as cp
-#import MS_PSX_Setup.py
-#import MS_Build_Products.py
-from MS_PSX_Setup_integrated import setup_psx
+
 
 class Args():
     """ Simple class to hold arguments """
@@ -149,11 +147,14 @@ defaults.input_dir = None        # path to input directory where all psx folders
 defaults.user_tags = ['MM']             # list of user tags to process
 defaults.flight_folders = [
     r"Z:\ATD\Drone Data Processing\Drone Images\East_Troublesome\Flights\102123",
-    r"Z:\JTM\Wingtra\WingtraPilotProjects\070923 Trip",
-    r"Z:\JTM\Wingtra\WingtraPilotProjects\053123 Trip",
-    r"Z:\JTM\Wingtra\WingtraPilotProjects\100622 Trip"
+    #r"Z:\JTM\Wingtra\WingtraPilotProjects\070923 Trip",
+    #r"Z:\JTM\Wingtra\WingtraPilotProjects\053123 Trip",
+    #r"Z:\JTM\Wingtra\WingtraPilotProjects\100622 Trip",
+    r"Z:\JTM\Wingtra\WingtraPilotProjects\090122 Trip"
                            ]         # list of photo folders to process
 defaults.geoid = r"Z:\JTM\Metashape\us_noaa_g2018u0.tif"              # path to geoid file
+defaults.dem_resolution = 0.04
+defaults.ortho_resolution = 0.02
 # ------------Alignment defaults -------------------------------------------------------
 defaults.setup = False              # run MS_PSX_Setup.py
 defaults.build = False             # run MS_Build_Products.py
@@ -180,7 +181,7 @@ defaults.pa_cam_opt_param = ['f','cx','cy','k1','k2','k3','p1','p2']
 
 # ------------Reprojection Error (re) defaults -----------------------------------------
 defaults.re = False                 # run re gradual selection iterations
-defaults.re_filt_level = 0.25        # re gradual selection filter level (default=0.3, optimum value: [0.3])
+defaults.re_filt_level = 0.30        # re gradual selection filter level (default=0.3, optimum value: [0.3])
 # re camera optimization parameters
 defaults.re_cam_opt_param = ['f','cx','cy','k1','k2','k3','p1','p2']
 # adjust camera optimization parameters when RE level is below threshold
@@ -647,6 +648,58 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                 f.write("Processing duration: " + str(tdiff) + "\n")
                 f.write("\n")
 
+def setup_psx(user_tags, flight_folder_list, psx, load_photos = True):
+    
+    #Open the Metashape document
+    
+    doc = Metashape.app.document
+    doc.open(psx)
+    # Initialize an empty dictionary
+    tag_dict = {}
+    group_dict = {}
+    # Regular expression pattern to match the text before "Flight"
+    pattern = re.compile(r'(.+?)\s*Flight\s*\d+')
+
+    geo_ref_list =[]
+    
+    orig_chunk = doc.chunk
+    chunk = orig_chunk.copy()
+    chunk.label = "Raw_Photos"
+    for flight_folder in flight_folder_list:
+        # Walk through the subdirectories
+        for subdir, dirs, _ in os.walk(flight_folder):
+            if "OUTPUT" in dirs:
+                # Extract group name using regular expression
+                match = pattern.search(os.path.basename(subdir))
+                temp_name =os.path.basename(subdir)
+                if match:
+                    group_name = match.group(1).strip()  # Get the matched group and strip whitespace
+                    ref_name = temp_name + ' geotags.csv'    # Check if the group name starts with any of the user-specified tags
+                    
+                    if any(group_name.startswith(tag) for tag in user_tags):
+                        if group_name not in tag_dict:
+                            tag_dict[group_name] = []
+                        tag_dict[group_name].append(subdir)
+
+                        # Process further if needed, e.g., add photos
+                        output_dir = os.path.join(subdir, "OUTPUT")
+                        if load_photos:
+                            photos = [os.path.join(output_dir, f) for f in os.listdir(output_dir) if f.lower().endswith(('.jpg', '.jpeg', '.png'))]
+                            if group_name not in group_dict:
+                                ##check if group_dict is empty
+                                if not group_dict:
+                                    group_dict[group_name] = 0
+                                else:
+                                    group_dict[group_name] = max(group_dict.values()) + 1
+                                current_group = chunk.addCameraGroup()
+                                current_group.label = group_name
+                            # Here you might want to add photos to the Metashape chunk
+                            print(f"Adding photos from {output_dir} to group {group_name}")
+                            chunk.addPhotos(photos, group=group_dict[group_name])
+                            
+                        geo_ref_list.append(os.path.join(output_dir, ref_name))
+                        chunk = doc.chunk
+    return geo_ref_list, chunk
 
 def parse_command_line_args(parg, doc):
     """
@@ -1164,7 +1217,7 @@ def filter_point_cloud(input_chunk, maxconf, doc):
     filter_chunk.point_cloud.resetFilters()  # resetting filter, so that all other points (i.e. high-confidence points) are now active
     return filter_chunk.label
 
-def buildDEMOrtho(input_chunk, doc):
+def buildDEMOrtho(input_chunk, doc, ortho_res = None, dem_res = None):
     # Ensure Metashape is running and a document is open
     print("Building DEM and Orthomosaic for " + input_chunk)
     activate_chunk(doc, input_chunk)  # Assuming doc is defined globally or passed to the function.
@@ -1175,26 +1228,56 @@ def buildDEMOrtho(input_chunk, doc):
     projection.type = Metashape.OrthoProjection.Type.Planar  # Set the projection type
     print(f"chunk.crs type: {type(chunk.crs)}, value: {chunk.crs}")
     
-    # 1. Building DEM
-    chunk.buildDem(
-            source_data=Metashape.DataSource.PointCloudData, 
-            interpolation=Metashape.EnabledInterpolation,
-            projection=projection  # Use the OrthoProjection
-        )
+    if dem_res is None:
+        # 1. Building DEM
+        chunk.buildDem(
+                source_data=Metashape.DataSource.PointCloudData, 
+                interpolation=Metashape.EnabledInterpolation,
+                projection=projection  # Use the OrthoProjection
+            )
+    else:
+        chunk.buildDem(
+                source_data=Metashape.DataSource.PointCloudData, 
+                interpolation=Metashape.EnabledInterpolation,
+                projection=projection,  # Use the OrthoProjection
+                resolution=dem_res
+            )
     print("DEM built successfully!")
 
     # 2. Building Orthomosaic with default settings
-    chunk.buildOrthomosaic(
-        surface_data=Metashape.DataSource.ElevationData,
-        blending_mode=Metashape.MosaicBlending,
-        fill_holes=True,
-        ghosting_filter=False,
-        cull_faces=False,
-        refine_seamlines=False,
-        projection=projection  # Use the OrthoProjection
-    )
+    if ortho_res is None:
+        chunk.buildOrthomosaic(
+            surface_data=Metashape.DataSource.ElevationData,
+            blending_mode=Metashape.MosaicBlending,
+            fill_holes=True,
+            ghosting_filter=False,
+            cull_faces=False,
+            refine_seamlines=False,
+            projection=projection  # Use the OrthoProjection
+        )
+    else:
+        chunk.buildOrthomosaic(
+            surface_data=Metashape.DataSource.ElevationData,
+            blending_mode=Metashape.MosaicBlending,
+            fill_holes=True,
+            ghosting_filter=False,
+            cull_faces=False,
+            refine_seamlines=False,
+            projection=projection,  # Use the OrthoProjection
+            resolution=ortho_res
+        )
     print("Orthomosaic built successfully!")
-    
+    if parg.log:
+        with open(parg.proclogname, 'a') as f:
+            f.write("\n")
+            f.write("============= AUTO GENERATED PROCESSING LOG TEXT BELOW =============\n")
+            f.write("DEM and Orthomosaic built successfully for chunk " + chunk.label + ".\n")
+            f.write("CRS: " + str(chunk.crs) + "\n")
+            f.write("Projection type: " + str(projection.type) + "\n")  
+            f.write("Resolution: " + str(chunk.elevation.resolution) + "\n")
+        
+        
+        
     doc.save()
 
 def getResolution(chunk, doc):
@@ -1291,9 +1374,7 @@ def main(parg, doc):
           doc = active Metashape.app.document object
           parg = Arg object with formatted argument attributes
     """
-    print(parg.setup==False and parg.align==False and parg.ru==False and parg.pa==False and parg.re==False and parg.build==False)
-    print(parg.setup)
-    print(parg.align)
+
     if parg.setup==False and parg.align==False and parg.ru==False and parg.pa==False and parg.re==False and parg.build==False:
         parg.setup = True
         parg.align = True
@@ -1334,233 +1415,213 @@ def main(parg, doc):
     
     user_tags = parg.user_tags
     flight_folders = parg.flight_folders
-    psx_list = []
-    if parg.input_dir is not None:
-        for tag in user_tags:
-            #Get last subdirectory in first entry of flight folders
-            flight_folder = flight_folders[0]
-            flight_folder = os.path.basename(os.path.normpath(flight_folder))
-            doc_name = tag + "_" + flight_folder + ".psx"
-            print("Saving PSX to: " + os.path.join(parg.input_dir, doc_name))
-            doc_path = os.path.join(parg.input_dir, doc_name)
-            doc.save(path = doc_path)
-            psx_list.append(doc_path)
-    else:
-        doc = Metashape.app.document
-        psx = doc.path
-        psx_list.append(psx)
+    doc = Metashape.app.document
+    psx = doc.path
         
     # ====================MAIN CODE STARTS HERE====================
     if parg.setup:
         geo_ref_dict = {}
-        for psx in psx_list:
-            print(f"PSX: {psx}")
-            print(f"Flight Folders: {flight_folders}")
-            print(f"User Tags: {user_tags}")
-            geo_ref_list, chunk = setup_psx(user_tags,flight_folders, psx)
-            geo_ref_dict[psx] = geo_ref_list
+        print(f"PSX: {psx}")
+        print(f"Flight Folders: {flight_folders}")
+        print(f"User Tags: {user_tags}")
+        geo_ref_list, chunk = setup_psx(user_tags,flight_folders, psx)
+        geo_ref_dict[psx] = geo_ref_list
     else:
         geo_ref_dict = {}
-        for psx in psx_list:
-            geo_ref_list, chunk = setup_psx(user_tags, flight_folders, psx, load_photos = False)
-            geo_ref_dict[psx] = geo_ref_list
+        geo_ref_list, chunk = setup_psx(user_tags, flight_folders, psx, load_photos = False)
+        geo_ref_dict[psx] = geo_ref_list
         
-    print(f"PSX List: {psx_list}")
-    for psx in psx_list:
-        doc.open(path = psx)
-        print(f"Geo Ref List: {geo_ref_dict[psx]}")
-        # ALIGN IMAGES
-        if parg.align:
-            # reference active chunk
-            if chunk is None:
-                chunk_label_list = [chunk.label for chunk in doc.chunks]
-                chunk = activate_chunk(doc, chunk_label_list[0])
+    doc.save(psx)
+    # ALIGN IMAGES
+    if parg.align:
+        chunk = doc.chunk
+        # reference active chunk
+        if chunk is None:
+            chunk_label_list = [chunk.label for chunk in doc.chunks]
+            chunk = activate_chunk(doc, chunk_label_list[0])
 
-            # copy active chunk, rename, make active
-            align_chunk = chunk.copy()
-            align_chunk.label = chunk.label + '_Align'
-            print('Copied chunk ' + chunk.label + ' to chunk ' + align_chunk.label)
+        # copy active chunk, rename, make active
+        align_chunk = chunk.copy()
+        align_chunk.label = chunk.label + '_Align'
+        print('Copied chunk ' + chunk.label + ' to chunk ' + align_chunk.label)
 
-            # Set camera optimization parameters.
-            # make a dictionary of camera opt params using arguments from parg
-            al_cam_param = blank_cam_opt_parameters.copy()
-            # loop through all cam parameters in parg list and set called params to True
-            for elem in parg.al_cam_opt_param:
-                al_cam_param['cal_{}'.format(elem)] = True
+        # Set camera optimization parameters.
+        # make a dictionary of camera opt params using arguments from parg
+        al_cam_param = blank_cam_opt_parameters.copy()
+        # loop through all cam parameters in parg list and set called params to True
+        for elem in parg.al_cam_opt_param:
+            al_cam_param['cal_{}'.format(elem)] = True
 
-            # Run alignment using align_images function
-            print('Aligning images')
-            geo_ref_list = geo_ref_dict[psx] 
-            if parg.log:
-                # if logging enabled use kwargs
-                print('Logging to file ' + parg.proclogname)
-                # write input and output chunk to log file
-                with open(parg.proclogname, 'a') as f:
-                    f.write("\n")
-                    f.write("============= AUTO GENERATED PROCESSING LOG TEXT BELOW =============\n")
-                    f.write("Copied chunk " + chunk.label + " to chunk " + align_chunk.label + "\n")
-                    f.write("Geo Ref List: " + str(geo_ref_list) + "\n")
-                # execute function
-                align_images(align_chunk)
-            else:
-                align_images(align_chunk)
-             
-              
-            print(f"Geo Ref List: {geo_ref_list}")
-            #for geo_ref in geo_ref_list:    
-                #chunk.importReference(os.path.join(geo_ref), delimiter = ',', columns = 'nxyzabcXZ')
-            doc.save()
+        # Run alignment using align_images function
+        print('Aligning images')
+        geo_ref_list = geo_ref_dict[psx] 
+        if parg.log:
+            # if logging enabled use kwargs
+            print('Logging to file ' + parg.proclogname)
+            # write input and output chunk to log file
+            with open(parg.proclogname, 'a') as f:
+                f.write("\n")
+                f.write("============= AUTO GENERATED PROCESSING LOG TEXT BELOW =============\n")
+                f.write("Copied chunk " + chunk.label + " to chunk " + align_chunk.label + "\n")
+                f.write("Geo Ref List: " + str(geo_ref_list) + "\n")
+            # execute function
+            align_images(align_chunk)
+        else:
+            align_images(align_chunk)
+            
+            
+        print(f"Geo Ref List: {geo_ref_list}")
+        #for geo_ref in geo_ref_list:    
+            #chunk.importReference(os.path.join(geo_ref), delimiter = ',', columns = 'nxyzabcXZ')
+        doc.save()
 
-        # RECONSTRUCTION UNCERTAINTY
-        if parg.ru:
-            # reference active chunk
-            chunk = doc.chunk
-            # check that chunk has a point cloud
-            try:
-                len(chunk.tie_points.points)
-            except AttributeError:
-                # print exception so it will be visible in console
-                print('AttributeError: Chunk "' + chunk.label + '" has no point cloud. Ensure that image '
-                                                                'alignment was performed. Stopping execution.')
-                raise AttributeError('Chunk "' + chunk.label + '" has no point cloud. Ensure that image alignment '
-                                                            'was performed. Stopping execution.')
+    # RECONSTRUCTION UNCERTAINTY
+    if parg.ru:
+        chunk = doc.chunk
+        # check that chunk has a point cloud
+        try:
+            len(chunk.tie_points.points)
+        except AttributeError:
+            # print exception so it will be visible in console
+            print('AttributeError: Chunk "' + chunk.label + '" has no point cloud. Ensure that image '
+                                                            'alignment was performed. Stopping execution.')
+            raise AttributeError('Chunk "' + chunk.label + '" has no point cloud. Ensure that image alignment '
+                                                        'was performed. Stopping execution.')
 
-            # copy active chunk, rename, make active
-            ru_chunk = chunk.copy()
-            ru_chunk.label = chunk.label + '_RU' + str(parg.ru_filt_level)
-            print('Copied chunk ' + chunk.label + ' to chunk ' + ru_chunk.label)
-            doc.save()
+        # copy active chunk, rename, make active
+        ru_chunk = chunk.copy()
+        ru_chunk.label = chunk.label + '_RU' + str(parg.ru_filt_level)
+        print('Copied chunk ' + chunk.label + ' to chunk ' + ru_chunk.label)
+        doc.save()
 
-            # Set camera optimization parameters.
-            # make a dictionary of camera opt params using arguments from parg
-            ru_cam_param = blank_cam_opt_parameters.copy()
-            # loop through all cam parameters in parg list and set called params to True
-            for elem in parg.ru_cam_opt_param:
-                ru_cam_param['cal_{}'.format(elem)] = True
+        # Set camera optimization parameters.
+        # make a dictionary of camera opt params using arguments from parg
+        ru_cam_param = blank_cam_opt_parameters.copy()
+        # loop through all cam parameters in parg list and set called params to True
+        for elem in parg.ru_cam_opt_param:
+            ru_cam_param['cal_{}'.format(elem)] = True
 
-            # Run Reconstruction Uncertainty using reconstruction_uncertainty function
-            print('Running Reconstruction Uncertainty optimization')
-            if parg.log:
-                # if logging enabled use kwargs
-                print('Logging to file ' + parg.proclogname)
-                # write input and output chunk to log file
-                with open(parg.proclogname, 'a') as f:
-                    f.write("\n")
-                    f.write("============= AUTO GENERATED PROCESSING LOG TEXT BELOW =============\n")
-                    f.write("Copied chunk " + chunk.label + " to chunk " + ru_chunk.label + "\n")
-                # execute function
-                reconstruction_uncertainty(ru_chunk, parg.ru_filt_level, parg.ru_cutoff, parg.ru_increment, ru_cam_param,
-                                        log=True, proclog=parg.proclogname)
-            else:
-                reconstruction_uncertainty(ru_chunk, parg.ru_filt_level, parg.ru_cutoff, parg.ru_increment, ru_cam_param)
-            doc.save()
+        # Run Reconstruction Uncertainty using reconstruction_uncertainty function
+        print('Running Reconstruction Uncertainty optimization')
+        if parg.log:
+            # if logging enabled use kwargs
+            print('Logging to file ' + parg.proclogname)
+            # write input and output chunk to log file
+            with open(parg.proclogname, 'a') as f:
+                f.write("\n")
+                f.write("============= AUTO GENERATED PROCESSING LOG TEXT BELOW =============\n")
+                f.write("Copied chunk " + chunk.label + " to chunk " + ru_chunk.label + "\n")
+            # execute function
+            reconstruction_uncertainty(ru_chunk, parg.ru_filt_level, parg.ru_cutoff, parg.ru_increment, ru_cam_param,
+                                    log=True, proclog=parg.proclogname)
+        else:
+            reconstruction_uncertainty(ru_chunk, parg.ru_filt_level, parg.ru_cutoff, parg.ru_increment, ru_cam_param)
+        doc.save()
 
-        # PROJECTION ACCURACY
-        if parg.pa:
-            # reference active chunk
-            chunk = doc.chunk
+    # PROJECTION ACCURACY
+    if parg.pa:
+        chunk = doc.chunk
 
-            # check that chunk has a point cloud
-            try:
-                len(chunk.tie_points.points)
-            except AttributeError:
-                # print exception so it will be visible in console
-                print('AttributeError: Chunk "' + chunk.label + '" has no point cloud. Ensure that image '
-                                                                'alignment was performed. Stopping execution.')
-                raise AttributeError('Chunk "' + chunk.label + '" has no point cloud. Ensure that image alignment '
-                                                            'was performed. Stopping execution.')
+        # check that chunk has a point cloud
+        try:
+            len(chunk.tie_points.points)
+        except AttributeError:
+            # print exception so it will be visible in console
+            print('AttributeError: Chunk "' + chunk.label + '" has no point cloud. Ensure that image '
+                                                            'alignment was performed. Stopping execution.')
+            raise AttributeError('Chunk "' + chunk.label + '" has no point cloud. Ensure that image alignment '
+                                                        'was performed. Stopping execution.')
 
-            # copy active chunk, rename, make active
-            pa_chunk = chunk.copy()
-            pa_chunk.label = chunk.label + '_PA' + str(parg.pa_filt_level)
-            print('Copied chunk ' + chunk.label + ' to chunk ' + pa_chunk.label)
+        # copy active chunk, rename, make active
+        pa_chunk = chunk.copy()
+        pa_chunk.label = chunk.label + '_PA' + str(parg.pa_filt_level)
+        print('Copied chunk ' + chunk.label + ' to chunk ' + pa_chunk.label)
 
-            # Set camera optimization parameters.
-            # make a dictionary of camera opt params using arguments from parg
-            pa_cam_param = blank_cam_opt_parameters.copy()
-            # loop through all cam parameters in parg list and set called params to True
-            for elem in parg.pa_cam_opt_param:
-                pa_cam_param['cal_{}'.format(elem)] = True
+        # Set camera optimization parameters.
+        # make a dictionary of camera opt params using arguments from parg
+        pa_cam_param = blank_cam_opt_parameters.copy()
+        # loop through all cam parameters in parg list and set called params to True
+        for elem in parg.pa_cam_opt_param:
+            pa_cam_param['cal_{}'.format(elem)] = True
 
-            # Run Projection Accuracy using projection_accuracy function
-            print('Running Projection Accuracy optimization')
-            if parg.log:
-                # if logging enabled use kwargs
-                print('Logging to file ' + parg.proclogname)
-                # write input and output chunk to log file
-                with open(parg.proclogname, 'a') as f:
-                    f.write("\n")
-                    f.write("============= AUTO GENERATED PROCESSING LOG TEXT BELOW =============\n")
-                    f.write("Copied chunk " + chunk.label + " to chunk " + pa_chunk.label + "\n")
-                # execute function
-                projection_accuracy(pa_chunk, parg.pa_filt_level, parg.pa_cutoff, parg.pa_increment, pa_cam_param, log=True,
-                                    proclog=parg.proclogname)
-            else:
-                projection_accuracy(pa_chunk, parg.pa_filt_level, parg.pa_cutoff, parg.pa_increment, pa_cam_param)
-            doc.save()
-
-        # REPROJECTION ERROR
-        if parg.re:
-            # reference active chunk
-            chunk = doc.chunk
-            chunk.tiepoint_accuracy = 0.1
-            # check that chunk has a point cloud
-            try:
-                len(chunk.tie_points.points)
-            except AttributeError:
-                # print exception so it will be visible in console
-                print('AttributeError: Chunk "' + chunk.label + '" has no point cloud. Ensure that image '
-                                                                'alignment was performed. Stopping execution.')
-                raise AttributeError('Chunk "' + chunk.label + '" has no point cloud. Ensure that image alignment '
-                                                            'was performed. Stopping execution.')
-
-            # copy active chunk, rename, make active
-            re_chunk = chunk.copy()
-            re_chunk.label = chunk.label + '_RE' + str(parg.re_filt_level)
-            print('Copied chunk ' + chunk.label + ' to chunk ' + re_chunk.label)
-
-            # Set INITIAL camera optimization parameters.
-            # make a dictionary of camera opt params using arguments from parg
-            re_cam_param = blank_cam_opt_parameters.copy()
-            # loop through all cam parameters in parg list and set called params to True
-            for elem in parg.re_cam_opt_param:
-                re_cam_param['cal_{}'.format(elem)] = True
-
-            # if re_adapt_camera, make cam_param for that also
-            if parg.re_adapt:
-                # make a dictionary of camera opt params using arguments from parg
-                re_adapted_cam_param = blank_cam_opt_parameters.copy()
-                # loop through all cam parameters in parg list and set called params to True
-                for elem in parg.re_adapted_cam_param:
-                    re_adapted_cam_param['cal_{}'.format(elem)] = True
-
-            # Run Reprojection Error using reprojection_error function
-            print('Running Reprojection Error optimization')
-            if parg.log:
-                # if logging enabled use kwargs
-                print('Logging to file ' + parg.proclogname)
-                # write input and output chunk to log file
-                with open(parg.proclogname, 'a') as f:
-                    f.write("\n")
-                    f.write("============= AUTO GENERATED PROCESSING LOG TEXT BELOW =============\n")
-                    f.write("Copied chunk " + chunk.label + " to chunk " + re_chunk.label + "\n")
-                # execute function, give additional kwargs if re_adapt_cam_opt enabled
-                if parg.re_adapt:
-                    reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, log=True,
-                                proclog=parg.proclogname, adapt_cam_opt=parg.re_adapt, adapt_cam_level=parg.re_adapt_level,
-                                adapt_cam_param=re_adapted_cam_param)
-                else:
-                    reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, log=True,
+        # Run Projection Accuracy using projection_accuracy function
+        print('Running Projection Accuracy optimization')
+        if parg.log:
+            # if logging enabled use kwargs
+            print('Logging to file ' + parg.proclogname)
+            # write input and output chunk to log file
+            with open(parg.proclogname, 'a') as f:
+                f.write("\n")
+                f.write("============= AUTO GENERATED PROCESSING LOG TEXT BELOW =============\n")
+                f.write("Copied chunk " + chunk.label + " to chunk " + pa_chunk.label + "\n")
+            # execute function
+            projection_accuracy(pa_chunk, parg.pa_filt_level, parg.pa_cutoff, parg.pa_increment, pa_cam_param, log=True,
                                 proclog=parg.proclogname)
+        else:
+            projection_accuracy(pa_chunk, parg.pa_filt_level, parg.pa_cutoff, parg.pa_increment, pa_cam_param)
+        doc.save()
+
+    # REPROJECTION ERROR
+    if parg.re:
+        chunk = doc.chunk
+        chunk.tiepoint_accuracy = 0.1
+        # check that chunk has a point cloud
+        try:
+            len(chunk.tie_points.points)
+        except AttributeError:
+            # print exception so it will be visible in console
+            print('AttributeError: Chunk "' + chunk.label + '" has no point cloud. Ensure that image '
+                                                            'alignment was performed. Stopping execution.')
+            raise AttributeError('Chunk "' + chunk.label + '" has no point cloud. Ensure that image alignment '
+                                                        'was performed. Stopping execution.')
+
+        # copy active chunk, rename, make active
+        re_chunk = chunk.copy()
+        re_chunk.label = chunk.label + '_RE' + str(parg.re_filt_level)
+        print('Copied chunk ' + chunk.label + ' to chunk ' + re_chunk.label)
+
+        # Set INITIAL camera optimization parameters.
+        # make a dictionary of camera opt params using arguments from parg
+        re_cam_param = blank_cam_opt_parameters.copy()
+        # loop through all cam parameters in parg list and set called params to True
+        for elem in parg.re_cam_opt_param:
+            re_cam_param['cal_{}'.format(elem)] = True
+
+        # if re_adapt_camera, make cam_param for that also
+        if parg.re_adapt:
+            # make a dictionary of camera opt params using arguments from parg
+            re_adapted_cam_param = blank_cam_opt_parameters.copy()
+            # loop through all cam parameters in parg list and set called params to True
+            for elem in parg.re_adapted_cam_param:
+                re_adapted_cam_param['cal_{}'.format(elem)] = True
+
+        # Run Reprojection Error using reprojection_error function
+        print('Running Reprojection Error optimization')
+        if parg.log:
+            # if logging enabled use kwargs
+            print('Logging to file ' + parg.proclogname)
+            # write input and output chunk to log file
+            with open(parg.proclogname, 'a') as f:
+                f.write("\n")
+                f.write("============= AUTO GENERATED PROCESSING LOG TEXT BELOW =============\n")
+                f.write("Copied chunk " + chunk.label + " to chunk " + re_chunk.label + "\n")
+            # execute function, give additional kwargs if re_adapt_cam_opt enabled
+            if parg.re_adapt:
+                reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, log=True,
+                            proclog=parg.proclogname, adapt_cam_opt=parg.re_adapt, adapt_cam_level=parg.re_adapt_level,
+                            adapt_cam_param=re_adapted_cam_param)
             else:
-                if parg.re_adapt:
-                    reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, 
-                                    adapt_cam_opt=parg.re_adapt, adapt_cam_level=parg.re_adapt_level,
-                                    adapt_cam_param=re_adapted_cam_param)
-                else:
-                    reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param)
-        
-            doc.save()
+                reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, log=True,
+                            proclog=parg.proclogname)
+        else:
+            if parg.re_adapt:
+                reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, 
+                                adapt_cam_opt=parg.re_adapt, adapt_cam_level=parg.re_adapt_level,
+                                adapt_cam_param=re_adapted_cam_param)
+            else:
+                reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param)
+    
+        doc.save()
 
     if parg.build:
         print("----------------------------------------------------------------------------------------")
@@ -1570,102 +1631,80 @@ def main(parg, doc):
         geoidPath = parg.geoid
         maxconf = parg.maxconf
         
-
-        #psx_list = [os.path.join(inputFolder, file) for file in os.listdir(inputFolder) if file.endswith(".psx")]
+        #Get file name of .psx file without .psx extension
+        psx_name = os.path.splitext(os.path.basename(psx))[0]
+        print("Processing " + psx_name)
+        chunk_label_list = [chunk.label for chunk in doc.chunks]
         
-        if len(psx_list) == 0:
-            if parg.input_dir is not None:
-                for tag in parg.user_tags:
-                    doc_name = tag + "_" + str(datetime.date.today()) + ".psx"
-                    doc_path = os.path.join(parg.input_dir, doc_name)
-                    doc.save(path = doc_path)
-                    psx_list.append(doc_path)
-                doc = Metashape.app.document
-            else:
-                doc = Metashape.app.document
-                psx = doc.path
-                psx_list.append(psx)
-        
-            
-        for psx in psx_list:
-            #Open the .psx file
-            doc = Metashape.app.document
-            print("Opening " + psx)
-            doc.open(psx)
-            #Get file name of .psx file without .psx extension
-            psx_name = os.path.splitext(os.path.basename(psx))[0]
-            print("Processing " + psx_name)
-            chunk_label_list = [chunk.label for chunk in doc.chunks]
-            
-            psx_folder = os.path.join(outputFolder, psx_name)
-            print("Output folder: " + psx_folder)
-            os.makedirs(os.path.dirname(psx_folder), exist_ok=True)
-    
-            post_error_chunk_list = [chunk for chunk in chunk_label_list if chunk.endswith("_RE0.25")]
-            print("Chunks to process: " + str(post_error_chunk_list))
+        psx_folder = os.path.join(outputFolder, psx_name)
+        print("Output folder: " + psx_folder)
+        os.makedirs(os.path.dirname(psx_folder), exist_ok=True)
 
-            #Get the chunk names and create a counter for progress updates
-            for current_chunk, i in zip(post_error_chunk_list, range(len(post_error_chunk_list))):
-                print("Processing " + current_chunk + " in " + psx_name) 
-                print("Chunk " + str(i+1) + " of " + str(len(post_error_chunk_list)) + " in " + psx_name)
-                #-------------Create File Paths-----------------#
-                file_name = current_chunk.replace("\\", "_") #Account for backslashes when creating file path
-                file_name = file_name.replace("/", "_") #Account for forward slashes when creating file path
-                outputOrtho = os.path.join(psx_folder, os.path.basename(psx)[:-4] + "____" "Ortho_"+ file_name+ ".tif") #[:-4] removes .psx extension
-                outputDEM = os.path.join(psx_folder, os.path.basename(psx)[:-4] + "____" +"DEM_"+ file_name + ".tif")
-                if os.path.exists(outputDEM) or os.path.exists(outputOrtho):
-                    print("File already exists, skipping " + outputDEM + " and " + outputOrtho + " of " + psx_name)
-                    continue
-            #------------Build Dense Cloud and Filter Point Cloud-----------------#
-                try:
-                    print("-------------------------------COPY CHUNKS FOR CLOUD---------------------------------------")
-                    copied_list = copy_chunks_for_cloud(current_chunk, doc)
-                    
-                    for copied_chunk in copied_list:
-                        chunk = activate_chunk(doc, copied_chunk)
-                        if len(chunk.depth_maps_sets) == 0:
-                            print("-------------------------------BUILD DENSE CLOUD---------------------------------------")
-                            print("")
-                            print(f"Filtering point cloud for {copied_chunk}")
-                            buildDenseCloud(copied_chunk, doc)
-                        print("-------------------------------FILTER DENSE CLOUD---------------------------------------")
-                        filtered_chunk = filter_point_cloud(copied_chunk, maxconf, doc)
-                        print("-------------------------------BUILD DEM/ORTHO---------------------------------------")
+        post_error_chunk_list = [chunk for chunk in chunk_label_list if chunk.endswith("_RE0.25")]
+        print("Chunks to process: " + str(post_error_chunk_list))
+
+        #Get the chunk names and create a counter for progress updates
+        for current_chunk, i in zip(post_error_chunk_list, range(len(post_error_chunk_list))):
+            print("Processing " + current_chunk + " in " + psx_name) 
+            print("Chunk " + str(i+1) + " of " + str(len(post_error_chunk_list)) + " in " + psx_name)
+            #-------------Create File Paths-----------------#
+            file_name = current_chunk.replace("\\", "_") #Account for backslashes when creating file path
+            file_name = file_name.replace("/", "_") #Account for forward slashes when creating file path
+            outputOrtho = os.path.join(psx_folder, os.path.basename(psx)[:-4] + "____" "Ortho_"+ file_name+ ".tif") #[:-4] removes .psx extension
+            outputDEM = os.path.join(psx_folder, os.path.basename(psx)[:-4] + "____" +"DEM_"+ file_name + ".tif")
+            if os.path.exists(outputDEM) or os.path.exists(outputOrtho):
+                print("File already exists, skipping " + outputDEM + " and " + outputOrtho + " of " + psx_name)
+                continue
+        #------------Build Dense Cloud and Filter Point Cloud-----------------#
+            try:
+                print("-------------------------------COPY CHUNKS FOR CLOUD---------------------------------------")
+                copied_list = copy_chunks_for_cloud(current_chunk, doc)
+                
+                for copied_chunk in copied_list:
+                    chunk = activate_chunk(doc, copied_chunk)
+                    if len(chunk.depth_maps_sets) == 0:
+                        print("-------------------------------BUILD DENSE CLOUD---------------------------------------")
                         print("")
-                        print(f"Building DEM and Orthomosaic for {filtered_chunk}")
-                        chunk = activate_chunk(doc, filtered_chunk)
-                        if chunk.elevation is None:    
-                            buildDEMOrtho(filtered_chunk, doc)
-                        print("-------------------------------EXPORT DEM/ORTHO---------------------------------------")
-                        outputOrtho = os.path.join(psx_folder, os.path.basename(psx)[:-4] + "____" + filtered_chunk + "_Ortho.tif") #[:-4] removes .psx extension
-                        outputDEM = os.path.join(psx_folder, os.path.basename(psx)[:-4] + "____" + filtered_chunk + "_DEM.tif")
-                        if os.path.exists(outputDEM) or os.path.exists(outputOrtho):
-                            print("File already exists, skipping " + outputDEM + " and " + outputOrtho + " of " + psx_name)
-                            continue
-                        #out_crs, in_crs = exportDEMOrtho(filtered_chunk, path_to_save_dem = outputDEM, path_to_save_ortho=outputOrtho, geoidPath=geoidPath)
-                        
-                        doc.save()
-                        
-                        if parg.log:
-                            # if logging enabled use kwargs
-                            print('Logging to file ' + parg.proclogname)
-                            # write input and output chunk to log file
-                            with open(parg.proclogname, 'a') as f:
-                                f.write("\n")
-                                f.write('--------------------------------------------------\n')
-                                f.write('PSX File: {}'.format(psx))
-                                f.write('\nExported on: {}'.format(datetime.now()))
-                                f.write('\nExported Chunks:')
-                                f.write('\nDEM: {}'.format(outputDEM))
-                                f.write('\nOrthomosaic: {}'.format(outputOrtho))
-                                #f.write('\nChunk CRS: {}'.format(in_crs))
-                                #f.write('\nOutput CRS: {}'.format(out_crs))
-
-                except Exception as e:
-                    print("Error processing " + current_chunk + " of " + psx_name)
-                    print(e)
+                        print(f"Filtering point cloud for {copied_chunk}")
+                        buildDenseCloud(copied_chunk, doc)
+                    print("-------------------------------FILTER DENSE CLOUD---------------------------------------")
+                    filtered_chunk = filter_point_cloud(copied_chunk, maxconf, doc)
+                    print("-------------------------------BUILD DEM/ORTHO---------------------------------------")
+                    print("")
+                    print(f"Building DEM and Orthomosaic for {filtered_chunk}")
+                    chunk = activate_chunk(doc, filtered_chunk)
+                    if chunk.elevation is None:    
+                        buildDEMOrtho(filtered_chunk, doc, parg.ortho_resolution, parg.demo_resolution)
+                    print("-------------------------------EXPORT DEM/ORTHO---------------------------------------")
+                    outputOrtho = os.path.join(psx_folder, os.path.basename(psx)[:-4] + "____" + filtered_chunk + "_Ortho.tif") #[:-4] removes .psx extension
+                    outputDEM = os.path.join(psx_folder, os.path.basename(psx)[:-4] + "____" + filtered_chunk + "_DEM.tif")
+                    if os.path.exists(outputDEM) or os.path.exists(outputOrtho):
+                        print("File already exists, skipping " + outputDEM + " and " + outputOrtho + " of " + psx_name)
+                        continue
+                    #out_crs, in_crs = exportDEMOrtho(filtered_chunk, path_to_save_dem = outputDEM, path_to_save_ortho=outputOrtho, geoidPath=geoidPath)
+                    
                     doc.save()
-                    continue
+                    
+                    if parg.log:
+                        # if logging enabled use kwargs
+                        print('Logging to file ' + parg.proclogname)
+                        # write input and output chunk to log file
+                        with open(parg.proclogname, 'a') as f:
+                            f.write("\n")
+                            f.write('--------------------------------------------------\n')
+                            f.write('PSX File: {}'.format(psx))
+                            f.write('\nExported on: {}'.format(datetime.now()))
+                            f.write('\nExported Chunks:')
+                            f.write('\nDEM: {}'.format(outputDEM))
+                            f.write('\nOrthomosaic: {}'.format(outputOrtho))
+                            #f.write('\nChunk CRS: {}'.format(in_crs))
+                            #f.write('\nOutput CRS: {}'.format(out_crs))
+
+            except Exception as e:
+                print("Error processing " + current_chunk + " of " + psx_name)
+                print(e)
+                doc.save()
+                continue
 # execute main() if script call
 if __name__ == '__main__':
     # reference active document
