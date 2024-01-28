@@ -143,7 +143,7 @@ defaults = Args()
 
 # ------------Chunk defaults -------------------------------------------------------
 defaults.initial_chunk = 'active'    # Name of first chunk to operate on ('active' = active chunk)
-defaults.input_dir = None        # path to input directory where all psx folders will be processed
+defaults.export_dir = None        # path to input directory where all psx folders will be processed
 defaults.user_tags = ['MM']             # list of user tags to process
 defaults.flight_folders = [
     r"Z:\ATD\Drone Data Processing\Drone Images\East_Troublesome\Flights\102123",
@@ -648,12 +648,8 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                 f.write("Processing duration: " + str(tdiff) + "\n")
                 f.write("\n")
 
-def setup_psx(user_tags, flight_folder_list, psx, load_photos = True):
-    
-    #Open the Metashape document
-    
-    doc = Metashape.app.document
-    doc.open(psx)
+def setup_psx(user_tags, flight_folder_list, doc, load_photos = True):
+
     # Initialize an empty dictionary
     tag_dict = {}
     group_dict = {}
@@ -661,10 +657,11 @@ def setup_psx(user_tags, flight_folder_list, psx, load_photos = True):
     pattern = re.compile(r'(.+?)\s*Flight\s*\d+')
 
     geo_ref_list =[]
-    
-    orig_chunk = doc.chunk
-    chunk = orig_chunk.copy()
-    chunk.label = "Raw_Photos"
+    if load_photos:
+        orig_chunk = doc.chunk
+        chunk = orig_chunk.copy()
+        chunk.label = "Raw_Photos"
+    chunk = doc.chunk
     for flight_folder in flight_folder_list:
         # Walk through the subdirectories
         for subdir, dirs, _ in os.walk(flight_folder):
@@ -797,8 +794,8 @@ def parse_command_line_args(parg, doc):
     parser.add_argument('-setup', '--setup', dest='setup', default=False, action='store_true',
                         help='Setup project for processing [default=DISABLED].')
     #add output_dir argument that accepts filepath
-    parser.add_argument('-input_dir', '--input_dir', dest='input_dir', nargs='?', const=parg.input_dir, type=str,
-                        help='Output directory for project [default=project directory]')
+    parser.add_argument('-export_dir', '--export_dir', dest='export_dir', nargs='?', const=parg.export_dir, type=str,
+                        help='Output directory for DEM and Ortho products [default=project directory]')
     # =================== Alignment args ======================================
     parser.add_argument('-align', '--align_images', dest='align', default=False, action='store_true',
                         help='Align images [default=DISABLED].')
@@ -875,10 +872,11 @@ def parse_command_line_args(parg, doc):
     parser.add_argument('-re_adapt_cam_param', '--re_adapt_camera_param', dest='re_adapt_add_cam_param', nargs='*',
                         help='Additional camera optimization parameters used when below RE pixel threshold'
                              + '[default="'"k4"'", "'"b1"'", "'"b2"'", "'"p3"'", "'"p4"'"]')
-
+    parser.add_argument('-pcbuild', '--pcbuild', dest='pcbuild', default=False, action='store_true',
+                    help='Build point cloud [default=DISABLED]')
     # =================== Export args =========================================
     parser.add_argument('-build', '--build', dest='build', default=False, action='store_true',
-                        help='Export results [default=DISABLED]')
+                        help='Build DEM and Ortho and Export results [default=DISABLED]')
     
     # =================== Logging args =============================================
     parser.add_argument('-log', '--logfile', dest='logfile', nargs='?', const='default.txt', type=str,
@@ -1046,6 +1044,8 @@ def parse_command_line_args(parg, doc):
         parg.re_adapt_add_cam_param = cam_arg_to_param_list(arglist.re_adapt_add_cam_param)
         parg.re_adapted_cam_param = parg.re_cam_opt_param + parg.re_adapt_add_cam_param
 
+    if arglist.pcbuild:
+        parg.pcbuild = True
     if arglist.build:
         parg.build = True
     if arglist.setup:
@@ -1128,10 +1128,15 @@ def parse_command_line_args(parg, doc):
     else:
         print('7. Setup DISABLED.')
     
+    if parg.pcbuild:
+        print('8. Build Point Cloud ENABLED.')
+    else:
+        print('8. Build Point Cloud DISABLED.')
+    
     if parg.build:
-        print('8. Build ENABLED.')
+        print('9. Build ENABLED.')
     else:   
-        print('8. Build DISABLED.')
+        print('9. Build DISABLED.')
         
     
     
@@ -1149,6 +1154,7 @@ def copy_chunks_for_cloud(post_error_chunk, doc):
 
     
     post_error_chunks = [chunk for chunk in doc.chunks if chunk.label.endswith('_PostError') or chunk.label.endswith('_PostError_PCFiltered')]
+    
     if len(post_error_chunks) > 0:
         print(f"The following PostError chunks already exist, skipping: {post_error_chunks}")
         return [chunk.label for chunk in post_error_chunks]
@@ -1375,12 +1381,13 @@ def main(parg, doc):
           parg = Arg object with formatted argument attributes
     """
 
-    if parg.setup==False and parg.align==False and parg.ru==False and parg.pa==False and parg.re==False and parg.build==False:
+    if parg.setup==False and parg.align==False and parg.ru==False and parg.pa==False and parg.re==False and parg.pcbuild==False and parg.build==False:
         parg.setup = True
         parg.align = True
         parg.ru = True
         parg.pa = True
         parg.re = True
+        parg.pcbuild = True
         parg.build = True
         parg.log = True
     # first verify that project has been saved/named, stop execution if not
@@ -1415,8 +1422,8 @@ def main(parg, doc):
     
     user_tags = parg.user_tags
     flight_folders = parg.flight_folders
-    doc = Metashape.app.document
     psx = doc.path
+    psx_name = os.path.splitext(os.path.basename(psx))[0]
         
     # ====================MAIN CODE STARTS HERE====================
     if parg.setup:
@@ -1424,16 +1431,17 @@ def main(parg, doc):
         print(f"PSX: {psx}")
         print(f"Flight Folders: {flight_folders}")
         print(f"User Tags: {user_tags}")
-        geo_ref_list, chunk = setup_psx(user_tags,flight_folders, psx)
+        geo_ref_list, chunk = setup_psx(user_tags,flight_folders, doc)
         geo_ref_dict[psx] = geo_ref_list
     else:
         geo_ref_dict = {}
-        geo_ref_list, chunk = setup_psx(user_tags, flight_folders, psx, load_photos = False)
+        geo_ref_list, chunk = setup_psx(user_tags, flight_folders, doc, load_photos = False)
         geo_ref_dict[psx] = geo_ref_list
         
     doc.save(psx)
     # ALIGN IMAGES
     if parg.align:
+        
         chunk = doc.chunk
         # reference active chunk
         if chunk is None:
@@ -1623,43 +1631,23 @@ def main(parg, doc):
     
         doc.save()
 
-    if parg.build:
+    if parg.pcbuild:
         print("----------------------------------------------------------------------------------------")
-
-        #make output folder called Exports in the same directory as psx file
-        outputFolder = os.path.join(os.path.dirname(doc.path), "Metashape Exports")
-        geoidPath = parg.geoid
+        chunk = doc.chunk
         maxconf = parg.maxconf
         
-        #Get file name of .psx file without .psx extension
-        psx_name = os.path.splitext(os.path.basename(psx))[0]
-        print("Processing " + psx_name)
         chunk_label_list = [chunk.label for chunk in doc.chunks]
-        
-        psx_folder = os.path.join(outputFolder, psx_name)
-        print("Output folder: " + psx_folder)
-        os.makedirs(os.path.dirname(psx_folder), exist_ok=True)
-
         post_error_chunk_list = [chunk for chunk in chunk_label_list if chunk.endswith("_RE0.25")]
         print("Chunks to process: " + str(post_error_chunk_list))
 
         #Get the chunk names and create a counter for progress updates
         for current_chunk, i in zip(post_error_chunk_list, range(len(post_error_chunk_list))):
-            print("Processing " + current_chunk + " in " + psx_name) 
-            print("Chunk " + str(i+1) + " of " + str(len(post_error_chunk_list)) + " in " + psx_name)
-            #-------------Create File Paths-----------------#
-            file_name = current_chunk.replace("\\", "_") #Account for backslashes when creating file path
-            file_name = file_name.replace("/", "_") #Account for forward slashes when creating file path
-            outputOrtho = os.path.join(psx_folder, os.path.basename(psx)[:-4] + "____" "Ortho_"+ file_name+ ".tif") #[:-4] removes .psx extension
-            outputDEM = os.path.join(psx_folder, os.path.basename(psx)[:-4] + "____" +"DEM_"+ file_name + ".tif")
-            if os.path.exists(outputDEM) or os.path.exists(outputOrtho):
-                print("File already exists, skipping " + outputDEM + " and " + outputOrtho + " of " + psx_name)
-                continue
+            print("Processing " + current_chunk)
+
         #------------Build Dense Cloud and Filter Point Cloud-----------------#
             try:
                 print("-------------------------------COPY CHUNKS FOR CLOUD---------------------------------------")
                 copied_list = copy_chunks_for_cloud(current_chunk, doc)
-                
                 for copied_chunk in copied_list:
                     chunk = activate_chunk(doc, copied_chunk)
                     if len(chunk.depth_maps_sets) == 0:
@@ -1669,42 +1657,77 @@ def main(parg, doc):
                         buildDenseCloud(copied_chunk, doc)
                     print("-------------------------------FILTER DENSE CLOUD---------------------------------------")
                     filtered_chunk = filter_point_cloud(copied_chunk, maxconf, doc)
-                    print("-------------------------------BUILD DEM/ORTHO---------------------------------------")
-                    print("")
-                    print(f"Building DEM and Orthomosaic for {filtered_chunk}")
-                    chunk = activate_chunk(doc, filtered_chunk)
-                    if chunk.elevation is None:    
-                        buildDEMOrtho(filtered_chunk, doc, parg.ortho_resolution, parg.demo_resolution)
-                    print("-------------------------------EXPORT DEM/ORTHO---------------------------------------")
-                    outputOrtho = os.path.join(psx_folder, os.path.basename(psx)[:-4] + "____" + filtered_chunk + "_Ortho.tif") #[:-4] removes .psx extension
-                    outputDEM = os.path.join(psx_folder, os.path.basename(psx)[:-4] + "____" + filtered_chunk + "_DEM.tif")
-                    if os.path.exists(outputDEM) or os.path.exists(outputOrtho):
-                        print("File already exists, skipping " + outputDEM + " and " + outputOrtho + " of " + psx_name)
-                        continue
-                    #out_crs, in_crs = exportDEMOrtho(filtered_chunk, path_to_save_dem = outputDEM, path_to_save_ortho=outputOrtho, geoidPath=geoidPath)
-                    
-                    doc.save()
-                    
-                    if parg.log:
-                        # if logging enabled use kwargs
-                        print('Logging to file ' + parg.proclogname)
-                        # write input and output chunk to log file
-                        with open(parg.proclogname, 'a') as f:
-                            f.write("\n")
-                            f.write('--------------------------------------------------\n')
-                            f.write('PSX File: {}'.format(psx))
-                            f.write('\nExported on: {}'.format(datetime.now()))
-                            f.write('\nExported Chunks:')
-                            f.write('\nDEM: {}'.format(outputDEM))
-                            f.write('\nOrthomosaic: {}'.format(outputOrtho))
-                            #f.write('\nChunk CRS: {}'.format(in_crs))
-                            #f.write('\nOutput CRS: {}'.format(out_crs))
-
             except Exception as e:
-                print("Error processing " + current_chunk + " of " + psx_name)
+                print("Error processing " + current_chunk)
                 print(e)
                 doc.save()
                 continue
+        
+    if parg.build:    
+
+        print("----------------------------------------------------------------------------------------")
+        chunk = doc.chunk
+        geoidPath = parg.geoid
+        
+        if parg.export_dir is not None:
+            psx_folder = parg.export_dir
+        else:
+             #Get file name of .psx file without .psx extension
+            psx_folder = os.path.join(os.path.dirname(psx), psx_name + " Exports")
+          
+        print("Processing " + psx_name) 
+        print("Output folder: " + psx_folder)
+        os.makedirs(os.path.dirname(psx_folder), exist_ok=True)
+        
+        chunk_label_list = [chunk.label for chunk in doc.chunks]
+        pc_chunk_list = [chunk for chunk in chunk_label_list if chunk.endswith("_PCFiltered")]
+        
+        #Get the chunk names and create a counter for progress updates
+        for current_chunk, i in zip(pc_chunk_list, range(len(pc_chunk_list))):
+            print("Processing " + current_chunk + " in " + psx_name) 
+            print("Chunk " + str(i+1) + " of " + str(len(post_error_chunk_list)) + " in " + psx_name)
+            #-------------Create File Paths-----------------#
+            file_name = current_chunk.replace("\\", "_") #Account for backslashes when creating file path
+            file_name = file_name.replace("/", "_") #Account for forward slashes when creating file path
+            outputOrtho = os.path.join(psx_folder, os.path.basename(psx)[:-4] + "____" "Ortho_"+ file_name+ ".tif") #[:-4] removes .psx extension
+            outputDEM = os.path.join(psx_folder, os.path.basename(psx)[:-4] + "____" +"DEM_"+ file_name + ".tif")
+            if os.path.exists(outputDEM) or os.path.exists(outputOrtho):
+                print("File already exists, skipping " + outputDEM + " and " + outputOrtho + " of " + psx_name)
+                continue    
+            
+            print("-------------------------------BUILD DEM/ORTHO---------------------------------------")
+            print("")
+            print(f"Building DEM and Orthomosaic for {filtered_chunk}")
+            
+            chunk = activate_chunk(doc, filtered_chunk)
+            if chunk.elevation is None:    
+                buildDEMOrtho(filtered_chunk, doc, parg.ortho_resolution, parg.dem_resolution)
+            print("-------------------------------EXPORT DEM/ORTHO---------------------------------------")
+            outputOrtho = os.path.join(psx_folder, os.path.basename(psx)[:-4] + "____" + filtered_chunk + "_Ortho.tif") #[:-4] removes .psx extension
+            outputDEM = os.path.join(psx_folder, os.path.basename(psx)[:-4] + "____" + filtered_chunk + "_DEM.tif")
+            if os.path.exists(outputDEM) or os.path.exists(outputOrtho):
+                print("File already exists, skipping " + outputDEM + " and " + outputOrtho + " of " + psx_name)
+                continue
+            out_crs, in_crs = exportDEMOrtho(filtered_chunk, path_to_save_dem = outputDEM, path_to_save_ortho=outputOrtho, geoidPath=geoidPath)
+            
+        doc.save()
+        
+        if parg.log:
+            # if logging enabled use kwargs
+            print('Logging to file ' + parg.proclogname)
+            # write input and output chunk to log file
+            with open(parg.proclogname, 'a') as f:
+                f.write("\n")
+                f.write('--------------------------------------------------\n')
+                f.write('PSX File: {}'.format(psx))
+                f.write('\nExported on: {}'.format(datetime.now()))
+                f.write('\nExported Chunks:')
+                f.write('\nDEM: {}'.format(outputDEM))
+                f.write('\nOrthomosaic: {}'.format(outputOrtho))
+                #f.write('\nChunk CRS: {}'.format(in_crs))
+                #f.write('\nOutput CRS: {}'.format(out_crs))
+
+
 # execute main() if script call
 if __name__ == '__main__':
     # reference active document
