@@ -1286,11 +1286,6 @@ def buildDEMOrtho(input_chunk, doc, ortho_res = None, dem_res = None):
         
     doc.save()
 
-def getResolution(chunk, doc):
-    activate_chunk(doc, chunk)
-    dem = chunk.elevation
-    resolution = dem.resolution
-    return resolution
 
 def exportDEMOrtho(input_chunk, path_to_save_dem=None, path_to_save_ortho = None, geoidPath = None):
     """
@@ -1371,8 +1366,6 @@ def exportDEMOrtho(input_chunk, path_to_save_dem=None, path_to_save_ortho = None
     doc.save()
     return output_projection.crs, chunk.crs
 
-
-    
 
 def main(parg, doc):
     """
@@ -1664,7 +1657,6 @@ def main(parg, doc):
                 continue
         
     if parg.build:    
-
         print("----------------------------------------------------------------------------------------")
         chunk = doc.chunk
         geoidPath = parg.geoid
