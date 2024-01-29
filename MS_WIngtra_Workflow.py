@@ -157,6 +157,7 @@ defaults.dem_resolution = 0.04
 defaults.ortho_resolution = 0.02
 # ------------Alignment defaults -------------------------------------------------------
 defaults.setup = False              # run MS_PSX_Setup.py
+defaults.pcbuild = False            # run MS_Build_PointCloud.py
 defaults.build = False             # run MS_Build_Products.py
 defaults.align = False              # run image alignment
 defaults.align_accuracy = 'high'    # image alignment accuracy (must be: 'highest', 'high', 'medium', 'low', 'lowest'
@@ -1287,7 +1288,7 @@ def buildDEMOrtho(input_chunk, doc, ortho_res = None, dem_res = None):
     doc.save()
 
 
-def exportDEMOrtho(input_chunk, path_to_save_dem=None, path_to_save_ortho = None, geoidPath = None):
+def exportDEMOrtho(input_chunk, path_to_save_dem=None, path_to_save_ortho = None, geoidPath = None, ortho_res = None, dem_res = None):
     """
     Export the DEM and Orthomosaic from the provided chunk to specified file paths.
 
@@ -1317,7 +1318,10 @@ def exportDEMOrtho(input_chunk, path_to_save_dem=None, path_to_save_ortho = None
     new_crs = Metashape.CoordinateSystem("EPSG::6342")
     #chunk.updateTransform()
     #chunk.crs = new_crs
-    
+    if ortho_res is None:
+        ortho_res = 0
+    if dem_res is None:
+        dem_res = 0
     # Create a new OrthoProjection object with the desired output CRS
     output_projection = Metashape.OrthoProjection()
     # Well Known Text for NAD83(2011) / UTM zone 13N + GEOID 18
@@ -1349,7 +1353,8 @@ def exportDEMOrtho(input_chunk, path_to_save_dem=None, path_to_save_ortho = None
         
         chunk.exportRaster(path=path_to_save_dem,
                         source_data=Metashape.DataSource.ElevationData,
-                        projection=output_projection)  # Using the custom CRS
+                        projection=output_projection,
+                        resolution = dem_res)  # Using the custom CRS
         print("DEM Exported Successfully!")
     
     if path_to_save_ortho is not None:
@@ -1359,7 +1364,8 @@ def exportDEMOrtho(input_chunk, path_to_save_dem=None, path_to_save_ortho = None
         chunk.exportRaster(path=path_to_save_ortho,
                         source_data=Metashape.DataSource.OrthomosaicData,
                         projection=output_projection,
-                        image_compression = compression)
+                        image_compression = compression,
+                        resolution = ortho_res)  # Using the custom CRS
         print("Orthomosaic Exported Successfully!")
     
 
@@ -1677,7 +1683,7 @@ def main(parg, doc):
         #Get the chunk names and create a counter for progress updates
         for current_chunk, i in zip(pc_chunk_list, range(len(pc_chunk_list))):
             print("Processing " + current_chunk + " in " + psx_name) 
-            print("Chunk " + str(i+1) + " of " + str(len(post_error_chunk_list)) + " in " + psx_name)
+            print("Chunk " + str(i+1) + " of " + str(len(pc_chunk_list)) + " in " + psx_name)
             #-------------Create File Paths-----------------#
             file_name = current_chunk.replace("\\", "_") #Account for backslashes when creating file path
             file_name = file_name.replace("/", "_") #Account for forward slashes when creating file path
@@ -1689,18 +1695,18 @@ def main(parg, doc):
             
             print("-------------------------------BUILD DEM/ORTHO---------------------------------------")
             print("")
-            print(f"Building DEM and Orthomosaic for {filtered_chunk}")
+            print(f"Building DEM and Orthomosaic for {current_chunk}")
             
-            chunk = activate_chunk(doc, filtered_chunk)
+            chunk = activate_chunk(doc, current_chunk)
             if chunk.elevation is None:    
-                buildDEMOrtho(filtered_chunk, doc, parg.ortho_resolution, parg.dem_resolution)
+                buildDEMOrtho(current_chunk, doc, ortho_res = parg.ortho_resolution, dem_res = parg.dem_resolution)
             print("-------------------------------EXPORT DEM/ORTHO---------------------------------------")
-            outputOrtho = os.path.join(psx_folder, os.path.basename(psx)[:-4] + "____" + filtered_chunk + "_Ortho.tif") #[:-4] removes .psx extension
-            outputDEM = os.path.join(psx_folder, os.path.basename(psx)[:-4] + "____" + filtered_chunk + "_DEM.tif")
+            outputOrtho = os.path.join(psx_folder, os.path.basename(psx)[:-4] + "____" + current_chunk + "_Ortho.tif") #[:-4] removes .psx extension
+            outputDEM = os.path.join(psx_folder, os.path.basename(psx)[:-4] + "____" + current_chunk + "_DEM.tif")
             if os.path.exists(outputDEM) or os.path.exists(outputOrtho):
                 print("File already exists, skipping " + outputDEM + " and " + outputOrtho + " of " + psx_name)
                 continue
-            out_crs, in_crs = exportDEMOrtho(filtered_chunk, path_to_save_dem = outputDEM, path_to_save_ortho=outputOrtho, geoidPath=geoidPath)
+            out_crs, in_crs = exportDEMOrtho(current_chunk, path_to_save_dem = outputDEM, path_to_save_ortho=outputOrtho, geoidPath=geoidPath, ortho_res = parg.ortho_resolution, dem_res = parg.dem_resolution)
             
         doc.save()
         
