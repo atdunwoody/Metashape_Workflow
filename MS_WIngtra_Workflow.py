@@ -146,8 +146,8 @@ defaults.initial_chunk = 'active'    # Name of first chunk to operate on ('activ
 defaults.export_dir = None        # path to input directory where all psx folders will be processed
 defaults.user_tags = ['MM']             # list of user tags to process
 defaults.flight_folders = [
-    r"Z:\ATD\Drone Data Processing\Drone Images\East_Troublesome\Flights\102123",
-    #r"Z:\JTM\Wingtra\WingtraPilotProjects\070923 Trip",
+    #r"Z:\ATD\Drone Data Processing\Drone Images\East_Troublesome\Flights\102123",
+    r"Z:\JTM\Wingtra\WingtraPilotProjects\070923 Trip",
     #r"Z:\JTM\Wingtra\WingtraPilotProjects\053123 Trip",
     #r"Z:\JTM\Wingtra\WingtraPilotProjects\100622 Trip",
     r"Z:\JTM\Wingtra\WingtraPilotProjects\090122 Trip"
@@ -1636,7 +1636,9 @@ def main(parg, doc):
         maxconf = parg.maxconf
         
         chunk_label_list = [chunk.label for chunk in doc.chunks]
-        post_error_chunk_list = [chunk for chunk in chunk_label_list if chunk.endswith("_RE0.25")]
+        #regex = re.compile(r'_RE\d+\.\d+$') # search for chunks that end with _RE<digits>.<digits>
+        #post_error_chunk_list = [chunk for chunk in chunk_label_list if regex.search(chunk)]
+        post_error_chunk_list = [chunk for chunk in chunk_label_list if chunk.endswith("_RE0.3")]
         print("Chunks to process: " + str(post_error_chunk_list))
 
         #Get the chunk names and create a counter for progress updates
@@ -1720,8 +1722,7 @@ def main(parg, doc):
                 f.write('PSX File: {}'.format(psx))
                 f.write('\nExported on: {}'.format(datetime.now()))
                 f.write('\nExported Chunks:')
-                f.write('\nDEM: {}'.format(outputDEM))
-                f.write('\nOrthomosaic: {}'.format(outputOrtho))
+
                 #f.write('\nChunk CRS: {}'.format(in_crs))
                 #f.write('\nOutput CRS: {}'.format(out_crs))
 
