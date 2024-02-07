@@ -147,9 +147,9 @@ defaults.export_dir = None        # path to input directory where all psx folder
 defaults.user_tags = ['MM']             # list of user tags to process
 defaults.flight_folders = [
     #r"Z:\ATD\Drone Data Processing\Drone Images\East_Troublesome\Flights\102123",
-    r"Z:\JTM\Wingtra\WingtraPilotProjects\070923 Trip",
+    #r"Z:\JTM\Wingtra\WingtraPilotProjects\070923 Trip",
     #r"Z:\JTM\Wingtra\WingtraPilotProjects\053123 Trip",
-    #r"Z:\JTM\Wingtra\WingtraPilotProjects\100622 Trip",
+    r"Z:\JTM\Wingtra\WingtraPilotProjects\100622 Trip",
     r"Z:\JTM\Wingtra\WingtraPilotProjects\090122 Trip"
                            ]         # list of photo folders to process
 defaults.geoid = r"Z:\JTM\Metashape\us_noaa_g2018u0.tif"              # path to geoid file
