@@ -29,9 +29,9 @@ def ypr_to_opk(yaw, pitch, roll):
 
     # Assuming C_E_B = C_n_b for this transformation (simplification)
     # Extract OPK angles from the rotation matrix
-    omega = np.arctan2(-C_n_b[1, 2], C_n_b[2, 2])
-    phi = np.arcsin(C_n_b[0, 2])
-    kappa = np.arctan2(-C_n_b[0, 1], C_n_b[0, 0])
+    omega = np.arcsin(C_n_b[0, 2])
+    phi = np.arctan2(-C_n_b[1, 2], C_n_b[2, 2])
+    kappa = np.arctan2(C_n_b[0, 1], C_n_b[0, 0])
 
     # Convert OPK angles from radians to degrees
     omega_deg = np.degrees(omega)
@@ -46,4 +46,9 @@ pitch = -0.027668341078037673 # Pitch in degrees
 roll = -0.069545872509479523# Roll in degrees
 
 omega, phi, kappa = ypr_to_opk(yaw, pitch, roll)
+print(f"Omega: {omega}, Phi: {phi}, Kappa: {kappa}")
+#Convert Omega Phi Kappa to degrees
+omega = np.degrees(omega)
+phi = np.degrees(phi)
+kappa = np.degrees(kappa)
 print(f"Omega: {omega}, Phi: {phi}, Kappa: {kappa}")
