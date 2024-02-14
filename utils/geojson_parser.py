@@ -1,10 +1,11 @@
 
 import json
 import csv
+import numpy as np
 
 # Load the raw data from the file
-jfile = r"Z:\ATD\Metashape_Alignment_Tests\Only_Checking_Initial_Photos\Test\MM_102123 Flight 01.geotaglog"
-csv_fn = r"Z:\ATD\Metashape_Alignment_Tests\Only_Checking_Initial_Photos\Test\MM_102123 Flight 01.csv"
+jfile = r"Z:\ATD\Metashape_Alignment_Tests\Only_Checking_Initial_Photos\Test\MM_102123 Flight 02.geotaglog"
+csv_fn = r"Z:\ATD\Metashape_Alignment_Tests\Only_Checking_Initial_Photos\Test\MM_102123 Flight 02.csv"
 with open(jfile, 'r') as file:
     data = json.load(file)
     images = data['images']  # Access the list of images
@@ -28,9 +29,9 @@ with open(csv_fn, 'w', newline='') as csvfile:
             'longitude [decimal degrees]': coordinate[1],
             'latitude [decimal degrees]': coordinate[0],
             'altitude [meter]': coordinate[2],
-            'yaw [degrees]': geo_ref['yaw'],
-            'pitch [degrees]': geo_ref['pitch'],
-            'roll [degrees]': geo_ref['roll'],
+            'yaw [degrees]': np.degrees(geo_ref['yaw']),
+            'pitch [degrees]': np.degrees(geo_ref['pitch']),
+            'roll [degrees]': np.degrees(geo_ref['roll']),
             'accuracy horizontal [meter]': geo_ref['hAccuracy'],
             'accuracy vertical [meter]': geo_ref['vAccuracy']
         })

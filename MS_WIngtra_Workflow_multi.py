@@ -146,21 +146,21 @@ defaults.initial_chunk = 'active'    # Name of first chunk to operate on ('activ
 defaults.export_dir = None        # path to input directory where all psx folders will be processed
 defaults.user_tags = ['MM']             # list of user tags to process
 defaults.flight_folders = [
-    #r"Z:\ATD\Drone Data Processing\Drone Images\East_Troublesome\Flights\102123", LM2, LPM, MM, MPM, UM1, UM2
-    #r"Z:\JTM\Wingtra\WingtraPilotProjects\070923 Trip", # LM2, LPM, MM, MPM, UM1, UM2
+    #r"Z:\ATD\Drone Data Processing\Drone Images\East_Troublesome\Flights\102123", # LM2, LPM, MM, MPM, UM1, UM2
+    r"Z:\JTM\Wingtra\WingtraPilotProjects\070923 Trip", # LM2, LPM, MM, MPM, UM1, UM2
     #r"Z:\JTM\Wingtra\WingtraPilotProjects\053123 Trip", # LPM, UM1, UM2
-    #r"Z:\JTM\Wingtra\WingtraPilotProjects\053123 Trip", # LPM, UM
     r"Z:\JTM\Wingtra\WingtraPilotProjects\100622 Trip", # LM2, LPM, MM, MPM, WC CHANNEL 1, 2, 4, 5, 6, 7, 8, 9, 10, 11
     # r"Z:\JTM\Wingtra\WingtraPilotProjects\090822 Trip" # MM, MPM, UM1, UM2, WC CHANNEL 4, 7, 8, 10, 11
-    r"Z:\JTM\Wingtra\WingtraPilotProjects\090122 Trip", # LM2, LPM, MM, MPM, WC CHANNEL 1, 2, 9
+    #r"Z:\JTM\Wingtra\WingtraPilotProjects\090122 Trip", # LM2, LPM, MM, MPM, WC CHANNEL 1, 2, 9
     #Z:\JTM\Wingtra\WingtraPilotProjects\081222 Trip, #LM2, LPM, UM1, UM2, WC Ch. 1, 2, 4, 5, 6
                            ]         # list of photo folders to process
 defaults.psx_list =[
-    r"Z:\ATD\Metashape_Alignment_Tests\Only_Checking_Initial_Photos\MM0922_1022.psx",
+    r"Z:\ATD\Metashape_Alignment_Tests\Only_Checking_Initial_Photos_Recent_Surveys\MM_0723_1023.psx",
+    r"Z:\ATD\Metashape_Alignment_Tests\Only_Checking_Initial_Photos_Recent_Surveys\MM_0723_1022.psx",
 ]
 defaults.geoid = r"Z:\JTM\Metashape\us_noaa_g2018u0.tif"              # path to geoid file
-defaults.dem_resolution = 0.04
-defaults.ortho_resolution = 0.02
+defaults.dem_resolution = 0.045
+defaults.ortho_resolution = 0.0225
 # ------------Alignment defaults -------------------------------------------------------
 defaults.setup = False              # run MS_PSX_Setup.py
 defaults.pcbuild = False            # run MS_Build_PointCloud.py
@@ -1198,9 +1198,7 @@ def buildDenseCloud(input_chunk, doc):
     print("Chunk: " + chunk.label)
     try:
         print("Building Dense Cloud for " + input_chunk)
-        #if len(chunk.dense_clouds) > 0:
-         #   print("Dense Cloud already exists for " + input_chunk + "ccontinuing to filter point cloud")
-          #  return
+        #Point Cloud Quality:Ultra = 1, High = 2, Medium = 4, Low = 8, Lowest = 16
         chunk.buildDepthMaps(downscale = 2, filter_mode = Metashape.MildFiltering)
         chunk.buildPointCloud(point_confidence = True, point_colors = True)
         doc.save()
@@ -1286,11 +1284,12 @@ def buildDEMOrtho(input_chunk, doc, ortho_res = None, dem_res = None):
     if parg.log:
         with open(parg.proclogname, 'a') as f:
             f.write("\n")
-            f.write("============= AUTO GENERATED PROCESSING LOG TEXT BELOW =============\n")
-            f.write("DEM and Orthomosaic built successfully for chunk " + chunk.label + ".\n")
+            f.write("DEM and Orthomosaic built for chunk " + chunk.label + ".\n")
             f.write("CRS: " + str(chunk.crs) + "\n")
             f.write("Projection type: " + str(projection.type) + "\n")  
-            f.write("Resolution: " + str(chunk.elevation.resolution) + "\n")
+            f.write("DEM Resolution: " + str(chunk.elevation.resolution) + "\n")
+            f.write("Orthomosaic Resolution: " + str(chunk.orthomosaic.resolution) + "\n")
+            f.write("Hole Filling Enabled: True\n")
         
         
         
@@ -1671,7 +1670,16 @@ def main(parg, doc):
                     print(e)
                     doc.save()
                     continue
-            
+            if parg.log:
+                # if logging enabled use kwargs
+                print('Logging to file ' + parg.proclogname)
+                # write input and output chunk to log file
+                with open(parg.proclogname, 'a') as f:
+                    f.write("\nPoint CLoud: \n")
+                    f.write("Built Dense Cloud and Filtered Point Cloud for chunk " + current_chunk + ".\n")
+                    f.write("Point Cloud Quality: High \n")
+                    f.write("Point Cloud Filter: Mild \n")
+                    f.write("Fltered by Confidence Level: " + str(maxconf) + "\n")
         if parg.build:    
             print("----------------------------------------------------------------------------------------")
             chunk = doc.chunk
@@ -1695,13 +1703,6 @@ def main(parg, doc):
                 print("Processing " + current_chunk + " in " + psx_name) 
                 print("Chunk " + str(i+1) + " of " + str(len(pc_chunk_list)) + " in " + psx_name)
                 #-------------Create File Paths-----------------#
-                file_name = current_chunk.replace("\\", "_") #Account for backslashes when creating file path
-                file_name = file_name.replace("/", "_") #Account for forward slashes when creating file path
-                outputOrtho = os.path.join(psx_folder, os.path.basename(psx)[:-4] + "____" "Ortho_"+ file_name+ ".tif") #[:-4] removes .psx extension
-                outputDEM = os.path.join(psx_folder, os.path.basename(psx)[:-4] + "____" +"DEM_"+ file_name + ".tif")
-                if os.path.exists(outputDEM) or os.path.exists(outputOrtho):
-                    print("File already exists, skipping " + outputDEM + " and " + outputOrtho + " of " + psx_name)
-                    continue    
                 
                 print("-------------------------------BUILD DEM/ORTHO---------------------------------------")
                 print("")
@@ -1729,7 +1730,7 @@ def main(parg, doc):
                     f.write('--------------------------------------------------\n')
                     f.write('PSX File: {}'.format(psx))
                     f.write('\nExported on: {}'.format(datetime.now()))
-                    f.write('\nExported Chunks:')
+                    f.write('\nExported Chunks:'.format(pc_chunk_list))
 
                     #f.write('\nChunk CRS: {}'.format(in_crs))
                     #f.write('\nOutput CRS: {}'.format(out_crs))
