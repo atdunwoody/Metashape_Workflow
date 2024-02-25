@@ -40,13 +40,17 @@ def ypr_to_opk(yaw, pitch, roll):
 
     return omega_deg, phi_deg, kappa_deg
 
-ypr =[1.853051662440684,-0.14336860460805362, 0.02338354103267193]
+ypr =[72.66743443,	-1.81625184,	-3.60504727]
 
 print(f"Yaw: {ypr[0]} rad, Pitch: {ypr[1]} rad, Roll: {ypr[2]} rad")
 
-yaw = np.degrees(ypr[0]) # Yaw in degrees
-pitch = np.degrees(ypr[1]) # Pitch in degrees
-roll = np.degrees(ypr[2]) # Roll in degrees
+#yaw = np.degrees(ypr[0]) # Yaw in degrees
+#pitch = np.degrees(ypr[1]) # Pitch in degrees
+#roll = np.degrees(ypr[2]) # Roll in degrees
+
+yaw = ypr[0] # Yaw in degrees
+pitch = ypr[1] # Pitch in degrees
+roll = ypr[2] # Roll in degrees
 
 omega, phi, kappa = ypr_to_opk(yaw, pitch, roll)
 

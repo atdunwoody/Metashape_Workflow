@@ -1,49 +1,45 @@
-import numpy as np
+import csv
+import math
 
-def compute_rotation_matrix(yaw, pitch, roll):
-    # Convert angles from degrees to radians
-    psi = np.radians(yaw)
-    theta = np.radians(pitch)
-    phi = np.radians(roll)
+# Define the input and output file paths
+input_file_path = r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MM_all_102023_pt_prec.txt"
+output_file_path = 'output_file_with_rms.tsv'
 
-    # Rotation matrices for yaw (psi), pitch (theta), and roll (phi)
-    Rz = np.array([[np.cos(psi), -np.sin(psi), 0],
-                   [np.sin(psi),  np.cos(psi), 0],
-                   [0, 0, 1]])
+# Initialize sums for calculating RMS
+sum_sq_x, sum_sq_y, sum_sq_z = 0, 0, 0
+count = 0
 
-    Ry = np.array([[np.cos(theta), 0, np.sin(theta)],
-                   [0, 1, 0],
-                   [-np.sin(theta), 0, np.cos(theta)]])
+# Open the input file for reading and the output file for writing
+with open(input_file_path, 'r', newline='') as infile, open(output_file_path, 'w', newline='') as outfile:
+    # Create a CSV reader and writer with tab delimiter
+    reader = csv.DictReader(infile, delimiter='\t')
+    fieldnames = reader.fieldnames  # No need to add new fields for RMS in the output file
+    writer = csv.DictWriter(outfile, fieldnames=fieldnames, delimiter='\t')
+    
+    # Write the header to the output file
+    writer.writeheader()
+    
+    # Iterate through each row in the input file
+    for row in reader:
+        # Convert standard deviations from mm to meters for consistency with squared terms
+        sX = float(row['sX(mm)']) / 1000
+        sY = float(row['sY(mm)']) / 1000
+        sZ = float(row['sZ(mm)']) / 1000
+        
+        count += 1  # Increment count for each point
+        # Add the squared standard deviations to the running sums
+        sum_sq_x += sX
+        sum_sq_y += sY
+        sum_sq_z += sZ
+        # Write the original row to the output file
+        writer.writerow(row)
 
-    Rx = np.array([[1, 0, 0],
-                   [0, np.cos(phi), -np.sin(phi)],
-                   [0, np.sin(phi),  np.cos(phi)]])
+#Average of the squared standard deviations
+avg_sq_x = sum_sq_x / count
+avg_sq_y = sum_sq_y / count
+avg_sq_z = sum_sq_z / count
 
-    # Combined rotation matrix C_n_b
-    C_n_b = Rz.dot(Ry).dot(Rx)
-    return C_n_b
-
-def ypr_to_opk(yaw, pitch, roll):
-    # Compute the YPR rotation matrix
-    C_n_b = compute_rotation_matrix(yaw, pitch, roll)
-
-    # Assuming C_E_B = C_n_b for this transformation (simplification)
-    # Extract OPK angles from the rotation matrix
-    omega = np.arctan2(-C_n_b[1, 2], C_n_b[2, 2])
-    phi = np.arcsin(C_n_b[0, 2])
-    kappa = np.arctan2(-C_n_b[0, 1], C_n_b[0, 0])
-
-    # Convert OPK angles from radians to degrees
-    omega_deg = np.degrees(omega)
-    phi_deg = np.degrees(phi)
-    kappa_deg = np.degrees(kappa)
-
-    return omega_deg, phi_deg, kappa_deg
-
-# Example usage
-yaw = -1.3782637119293213 # Yaw in degrees
-pitch = -0.027668341078037673 # Pitch in degrees
-roll = -0.069545872509479523# Roll in degrees
-
-omega, phi, kappa = ypr_to_opk(yaw, pitch, roll)
-print(f"Omega: {omega}, Phi: {phi}, Kappa: {kappa}")
+print(f"Average of the squared standard deviations:")
+print(f"X: {avg_sq_x}")
+print(f"Y: {avg_sq_y}")
+print(f"Z: {avg_sq_z}")

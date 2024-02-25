@@ -131,7 +131,7 @@ import re
 from datetime import datetime
 import argparse
 import copy as cp
-
+import math
 
 class Args():
     """ Simple class to hold arguments """
@@ -146,17 +146,24 @@ defaults.initial_chunk = 'active'    # Name of first chunk to operate on ('activ
 defaults.export_dir = None        # path to input directory where all psx folders will be processed
 defaults.user_tags = ['MM']             # list of user tags to process
 defaults.flight_folders = [
-    #r"Z:\ATD\Drone Data Processing\Drone Images\East_Troublesome\Flights\102123", # LM2, LPM, MM, MPM, UM1, UM2
+    r"Z:\ATD\Drone Data Processing\Drone Images\East_Troublesome\Flights\102123", # LM2, LPM, MM, MPM, UM1, UM2
     r"Z:\JTM\Wingtra\WingtraPilotProjects\070923 Trip", # LM2, LPM, MM, MPM, UM1, UM2
-    #r"Z:\JTM\Wingtra\WingtraPilotProjects\053123 Trip", # LPM, UM1, UM2
-    r"Z:\JTM\Wingtra\WingtraPilotProjects\100622 Trip", # LM2, LPM, MM, MPM, WC CHANNEL 1, 2, 4, 5, 6, 7, 8, 9, 10, 11
-    # r"Z:\JTM\Wingtra\WingtraPilotProjects\090822 Trip" # MM, MPM, UM1, UM2, WC CHANNEL 4, 7, 8, 10, 11
-    #r"Z:\JTM\Wingtra\WingtraPilotProjects\090122 Trip", # LM2, LPM, MM, MPM, WC CHANNEL 1, 2, 9
-    #Z:\JTM\Wingtra\WingtraPilotProjects\081222 Trip, #LM2, LPM, UM1, UM2, WC Ch. 1, 2, 4, 5, 6
+    #r"Z:\JTM\Wingtra\WingtraPilotProjects\053123 Trip", # Don't Use 
+    #r"Z:\ATD\Drone Data Processing\Drone Images\East_Troublesome\Flights\10__22" # Re-PPK processed 
+    r"Z:\JTM\Wingtra\WingtraPilotProjects\100622 Trip", # LM2, LPM, MM, MPM
+    #r"Z:\JTM\Wingtra\WingtraPilotProjects\090822 Trip" #  UM1, UM2
+    #r"Z:\JTM\Wingtra\WingtraPilotProjects\090122 Trip", # MM, MPM
+    r"Z:\JTM\Wingtra\WingtraPilotProjects\081222 Trip" # LM2, LPM
+    #r"Z:\JTM\Wingtra\WingtraPilotProjects\071922 Trip" # UM1, UM2
                            ]         # list of photo folders to process
 defaults.psx_list =[
-    r"Z:\ATD\Metashape_Alignment_Tests\Only_Checking_Initial_Photos_Recent_Surveys\MM_0723_1023.psx",
-    r"Z:\ATD\Metashape_Alignment_Tests\Only_Checking_Initial_Photos_Recent_Surveys\MM_0723_1022.psx",
+    r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LM2_all_102023.psx"
+    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023.psx",
+    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MM_all_102023.psx",
+    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\MPM_all_102023.psx",
+    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\UM1_all_102023.psx",
+    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\UM2_all_102023.psx",
+    
 ]
 defaults.geoid = r"Z:\JTM\Metashape\us_noaa_g2018u0.tif"              # path to geoid file
 defaults.dem_resolution = 0.045
@@ -188,15 +195,15 @@ defaults.pa_cam_opt_param = ['f','cx','cy','k1','k2','k3','p1','p2']
 
 # ------------Reprojection Error (re) defaults -----------------------------------------
 defaults.re = False                 # run re gradual selection iterations
-defaults.re_filt_level = 0.30        # re gradual selection filter level (default=0.3, optimum value: [0.3])
+defaults.re_filt_level = 0.3        # re gradual selection filter level (default=0.3, optimum value: [0.3])
 # re camera optimization parameters
 defaults.re_cam_opt_param = ['f','cx','cy','k1','k2','k3','p1','p2']
 # adjust camera optimization parameters when RE level is below threshold
 defaults.re_adapt = True            # enable adaptive camera opt params (default=True)
 defaults.re_adapt_level = 1         # RE level at which to adjust camera opt params (default=1)
 # re adjust camera optimization parameters. These are enabled and added to initial re_cam_opt_param
-defaults.re_adapt_add_cam_param = ['k4','b1','b2','p3','p4']
-
+defaults.re_adapt_add_cam_param = []
+#defaults.re_adapt_add_cam_param = ['k4','b1','b2','p3','p4']
 # ------------Process logging defaults ------------------------------------------------
 defaults.log = True
 # logfile name. Set to 'default.txt' to have output file named X_ProcessingLog.txt, where X=name of Metashape project
@@ -359,7 +366,8 @@ def reconstruction_uncertainty(chunk, ru_filt_level_param, ru_cutoff, ru_increme
                               fit_p1=cam_opt_parameters['cal_p1'],
                               fit_p2=cam_opt_parameters['cal_p2'],
                               fit_p3=cam_opt_parameters['cal_p3'],
-                              fit_p4=cam_opt_parameters['cal_p4'])
+                              fit_p4=cam_opt_parameters['cal_p4'],
+                              tiepoint_covariance = True)
         noptimized = noptimized + 1
         print("completed optimization #", noptimized)
     else:
@@ -474,7 +482,8 @@ def projection_accuracy(chunk, pa_filt_level_param, pa_cutoff, pa_increment, cam
                               fit_p1=cam_opt_parameters['cal_p1'],
                               fit_p2=cam_opt_parameters['cal_p2'],
                               fit_p3=cam_opt_parameters['cal_p3'],
-                              fit_p4=cam_opt_parameters['cal_p4'])
+                              fit_p4=cam_opt_parameters['cal_p4'],
+                              tiepoint_covariance = True)
         noptimized = noptimized + 1
         print("completed optimization #", noptimized)
     else:
@@ -542,8 +551,34 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
     # get initial point count
     points = chunk.tie_points.points
     init_pointcount = len([True for point in points if point.valid is True])
-
+    if 'log' in kwargs:
+        # check that filename defined
+        if 'proclog' in kwargs:
+            # write results to processing log
+            with open(kwargs['proclog'], 'a') as f:
+                f.write("\n")
+                f.write("============= AUTO GENERATED PROCESSING LOG TEXT BELOW =============\n")
+                f.write("Reprojection Error optimization:\n")
+                f.write("Chunk: " + chunk.label + "\n")
+                f.write("SEUW shoudl be getting closer to 1 every iteration.\n")
+    SEUWlast = 0
     while True:
+        if noptimized > 0:
+            SEUWlast = SEUW
+        else:
+            SEUWlast = 0
+        metadata = chunk.meta
+        SEUW = float(metadata['OptimizeCameras/sigma0'])
+        if 'log' in kwargs:
+            # check that filename defined
+            if 'proclog' in kwargs:
+                # write results to processing log
+                with open(kwargs['proclog'], 'a') as f:
+                    f.write(f"SEUW/Sigma0 value for iteration #{noptimized + 1}: {SEUW:.4f}\n")
+        # SEUW should be getting closer to 1 every iteration, if it's not, break
+        #if math.fabs(1 - SEUW) > math.fabs(1 - SEUWlast): 
+         #   break  
+        
         # define threshold variables
         points = chunk.tie_points.points
         f = Metashape.TiePoints.Filter()
@@ -555,7 +590,9 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
         # calculate number of selected points
         nselected = len([True for point in points if point.valid is True and point.selected is True])
         print(nselected, " points selected")
-        if nselected < 50:
+        if nselected < 1000:
+            break
+        if noptimized > 8: # Don't overfit, break after 8 iterations
             break
         npoints = len(points)
         while nselected * (1 / re_cutoff) > npoints:
@@ -617,12 +654,109 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                               fit_p1=cam_opt_parameters['cal_p1'],
                               fit_p2=cam_opt_parameters['cal_p2'],
                               fit_p3=cam_opt_parameters['cal_p3'],
-                              fit_p4=cam_opt_parameters['cal_p4'])
+                              fit_p4=cam_opt_parameters['cal_p4'],
+                              tiepoint_covariance = True)
         noptimized = noptimized + 1
+        SEUWlast = SEUW
         print("completed optimization #", noptimized)
     else:
         print("If this shows up I don't understand while True loops")
 
+    #Steps 14 - 18 in USGS document
+    noptimized_round2 = 0
+    while True:
+            
+        metadata = chunk.meta
+        SEUW = float(metadata['OptimizeCameras/sigma0'])
+        if 'log' in kwargs:
+            # check that filename defined
+            if 'proclog' in kwargs:
+                # write results to processing log
+                with open(kwargs['proclog'], 'a') as f:
+                    f.write(f"SEUW/Sigma0 value for iteration #{noptimized + noptimized_round2 + 1}: {SEUW:.4f}\n")
+        # SEUW should be getting closer to 1 every iteration, if it's not, break
+        #if math.fabs(1 - SEUW) > math.fabs(1 - SEUWlast): 
+         #   break            
+        # define threshold variables
+        points = chunk.tie_points.points
+        f = Metashape.TiePoints.Filter()
+        threshold_re = re_filt_level_param - 0.13
+        print("initializing with RE =", threshold_re)
+        # initialize filter for RE
+        f.init(chunk, criterion=Metashape.TiePoints.Filter.ReprojectionError)
+        f.selectPoints(threshold_re)
+        # calculate number of selected points
+        nselected = len([True for point in points if point.valid is True and point.selected is True])
+        print(nselected, " points selected")
+        if nselected < 1000:
+            break
+        if noptimized_round2 > 6:
+            break
+        npoints = len(points)
+        while nselected * (1 / re_cutoff) > npoints:
+            print("RE threshold ", threshold_re, "selected ", nselected, "/", npoints, "(",
+                  round(nselected / npoints * 100, 4), " %) of  points. Adjusting")
+            threshold_re = threshold_re + re_increment
+            f.selectPoints(threshold_re)
+            nselected = len([True for point in points if point.valid is True and point.selected is True])
+            # if increment is too large, 0 points will be selected. Adjust increment value downward by 25%. Only do this 10 times before stopping.
+            if nselected == 0:
+                re_increment = re_increment 
+                ninc_reduced = ninc_reduced + 1
+                if ninc_reduced > 15:
+                    print('RE filter increment reduction called ten times, stopping execution.')
+                    break
+                else:
+                    print("RE increment too large, reducing to " + str(re_increment) + ".")
+
+        print("RE threshold ", threshold_re, " is ", round(nselected / npoints * 100, 4),
+              "% of total points. Ready to delete")
+        ndeleted = ndeleted + nselected
+        chunk.tie_points.removeSelectedPoints()
+        print("RE", threshold_re, "deleted", nselected, "points")
+        
+        # check if adaptive camera optimization parameters called
+        if 'adapt_cam_opt' in kwargs:
+            # if true
+            if kwargs['adapt_cam_opt']:
+                # check if other required kwargs present
+                if 'adapt_cam_level' not in kwargs or 'adapt_cam_param' not in kwargs:
+                # print exception so it will be visible in console, then raise exception
+                    print('ArgumentError: '"'adapt_cam_opt'"' keyword called, but '"'adapt_cam_level'"' and '"'adapt_cam_param'"' not present.')
+                    raise Exception(
+                            'ArgumentError: '"'adapt_cam_opt'"' keyword called, but '"'adapt_cam_level'"' and '"'adapt_cam_param'"' not present.')
+                # get 'adapt_cam_level', should be float 
+                adapt_cam_level = kwargs['adapt_cam_level']
+                if not str(adapt_cam_level).replace('.','',1).isdigit():
+                    # print exception so it will be visible in console, then raise exception
+                    print('ArgumentError: '"'adapt_cam_level'"' keyword is not a number.')
+                    raise Exception('ArgumentError: '"'adapt_cam_level'"' keyword is not a number.')
+    
+                # If threshold gets below adapt_cam_level, add additional camera params.
+                if threshold_re < adapt_cam_level:
+                    # then enable additional lens params
+                    cam_opt_parameters = kwargs['adapt_cam_param']
+                    cam_opt_parameters_str = str([k for (k, v) in cam_opt_parameters.items() if v])
+                    cam_opt_parameters_str = cam_opt_parameters_str.replace('cal_','')
+                    print('RE below ' +  str(adapt_cam_level) + ' pixel, enabling ' + cam_opt_parameters_str)
+
+        chunk.optimizeCameras(fit_f=cam_opt_parameters['cal_f'],
+                              fit_cx=cam_opt_parameters['cal_cx'],
+                              fit_cy=cam_opt_parameters['cal_cy'],
+                              fit_b1=cam_opt_parameters['cal_b1'],
+                              fit_b2=cam_opt_parameters['cal_b2'],
+                              fit_k1=cam_opt_parameters['cal_k1'],
+                              fit_k2=cam_opt_parameters['cal_k2'],
+                              fit_k3=cam_opt_parameters['cal_k3'],
+                              fit_k4=cam_opt_parameters['cal_k4'],
+                              fit_p1=cam_opt_parameters['cal_p1'],
+                              fit_p2=cam_opt_parameters['cal_p2'],
+                              fit_p3=cam_opt_parameters['cal_p3'],
+                              fit_p4=cam_opt_parameters['cal_p4'],
+                              tiepoint_covariance = True)
+        noptimized_round2 = noptimized_round2 + 1
+        SEUWlast = SEUW
+        print("completed optimization #", noptimized)
     # get end time for processing log
     endtime = datetime.now()
     tdiff = endtime - starttime
@@ -633,19 +767,18 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
     print('Reprojection Error optimization completed.\n' +
           str(ndeleted) + ' of ' + str(init_pointcount) + ' removed in ' + str(
         noptimized) + ' optimizations on chunk "' + chunk.label + '".\n')
-
+    f.init(chunk, criterion=Metashape.TiePoints.Filter.ReprojectionError)
+    f.selectPoints(threshold_re)
+    f.resetSelection()
     # Check if logging option enabled
     if 'log' in kwargs:
         # check that filename defined
         if 'proclog' in kwargs:
             # write results to processing log
             with open(kwargs['proclog'], 'a') as f:
-                f.write("\n")
-                f.write("============= AUTO GENERATED PROCESSING LOG TEXT BELOW =============\n")
-                f.write("Reprojection Error optimization:\n")
-                f.write("Chunk: " + chunk.label + "\n")
+               
                 f.write(str(ndeleted) + " of " + str(init_pointcount) + " removed in " + str(
-                    noptimized) + " optimizations.\n")
+                    noptimized + noptimized_round2 + 1) + " optimizations.\n")
                 f.write("Final point count: " + str(end_pointcount) + "\n")
                 f.write("Final Reprojection Error: " + str(threshold_re) + ".\n")
                 f.write('Final camera lens calibration parameters: ' + ', '.join(
@@ -653,6 +786,11 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                 f.write("Start time: " + str(starttime) + "\n")
                 f.write("End time: " + str(endtime) + "\n")
                 f.write("Processing duration: " + str(tdiff) + "\n")
+                f.write(f"Adaptive camera optimization enabled: {kwargs['adapt_cam_opt']}\n")
+                f.write("Adaptive camera optimization level: " + str(adapt_cam_level) + "\n")
+                f.write("\n Metadata for chunk: \n")
+                for key, value in chunk.tie_points.meta.items():
+                    f.write(f"{key}: {value}\n")
                 f.write("\n")
 
 def setup_psx(user_tags, flight_folder_list, doc, load_photos = True):
@@ -1231,7 +1369,7 @@ def filter_point_cloud(input_chunk, maxconf, doc):
     filter_chunk.point_cloud.resetFilters()  # resetting filter, so that all other points (i.e. high-confidence points) are now active
     return filter_chunk.label
 
-def buildDEMOrtho(input_chunk, doc, ortho_res = None, dem_res = None):
+def buildDEMOrtho(input_chunk, doc, ortho_res = None, dem_res = None, interpolation = False):
     # Ensure Metashape is running and a document is open
     print("Building DEM and Orthomosaic for " + input_chunk)
     activate_chunk(doc, input_chunk)  # Assuming doc is defined globally or passed to the function.
@@ -1242,19 +1380,24 @@ def buildDEMOrtho(input_chunk, doc, ortho_res = None, dem_res = None):
     projection.type = Metashape.OrthoProjection.Type.Planar  # Set the projection type
     print(f"chunk.crs type: {type(chunk.crs)}, value: {chunk.crs}")
     
-    if dem_res is None:
-        # 1. Building DEM
+    if dem_res is None and interpolation is False:
         chunk.buildDem(
                 source_data=Metashape.DataSource.PointCloudData, 
-                interpolation=Metashape.EnabledInterpolation,
+                interpolation=Metashape.DisabledInterpolation,
                 projection=projection  # Use the OrthoProjection
+            )
+    elif dem_res is not None and interpolation is False:
+        chunk.buildDem(
+                source_data=Metashape.DataSource.PointCloudData, 
+                interpolation=Metashape.DisabledInterpolation,
+                projection=projection,  # Use the OrthoProjection
+                resolution=dem_res
             )
     else:
         chunk.buildDem(
                 source_data=Metashape.DataSource.PointCloudData, 
                 interpolation=Metashape.EnabledInterpolation,
                 projection=projection,  # Use the OrthoProjection
-                resolution=dem_res
             )
     print("DEM built successfully!")
 
@@ -1263,7 +1406,7 @@ def buildDEMOrtho(input_chunk, doc, ortho_res = None, dem_res = None):
         chunk.buildOrthomosaic(
             surface_data=Metashape.DataSource.ElevationData,
             blending_mode=Metashape.MosaicBlending,
-            fill_holes=True,
+            fill_holes=False,
             ghosting_filter=False,
             cull_faces=False,
             refine_seamlines=False,
@@ -1273,7 +1416,7 @@ def buildDEMOrtho(input_chunk, doc, ortho_res = None, dem_res = None):
         chunk.buildOrthomosaic(
             surface_data=Metashape.DataSource.ElevationData,
             blending_mode=Metashape.MosaicBlending,
-            fill_holes=True,
+            fill_holes=False,
             ghosting_filter=False,
             cull_faces=False,
             refine_seamlines=False,
@@ -1288,8 +1431,9 @@ def buildDEMOrtho(input_chunk, doc, ortho_res = None, dem_res = None):
             f.write("CRS: " + str(chunk.crs) + "\n")
             f.write("Projection type: " + str(projection.type) + "\n")  
             f.write("DEM Resolution: " + str(chunk.elevation.resolution) + "\n")
+            f.write(f"Interpolation Enabled: {interpolation}\n")
             f.write("Orthomosaic Resolution: " + str(chunk.orthomosaic.resolution) + "\n")
-            f.write("Hole Filling Enabled: True\n")
+            f.write("Orthomosaic Hole Filling Enabled: True\n")
         
         
         
@@ -1388,6 +1532,13 @@ def main(parg, doc):
     """
     for psx_file in parg.psx_list:
         # Open the project file
+        processing_start = datetime.now()
+        if parg.log:
+            with open(parg.proclogname, 'a') as f:
+                f.write("\n")
+                f.write("============= PROCESSING START =============\n")
+                f.write("Processing started at: " + str(processing_start) + "\n")
+                f.write("Processing PSX: " + psx_file + "\n")
         doc.open(psx_file)
         # Get the active chunk
         doc = Metashape.app.document
@@ -1434,9 +1585,17 @@ def main(parg, doc):
         # ====================MAIN CODE STARTS HERE====================
         if parg.setup:
             geo_ref_dict = {}
-            print(f"PSX: {psx}")
             print(f"Flight Folders: {flight_folders}")
             print(f"User Tags: {user_tags}")
+            if parg.log:
+                print('Logging to file ' + parg.proclogname)
+                with open(parg.proclogname, 'a') as f:
+                    f.write("============= SETUP =============\n")
+                    f.write("PSX: " + psx + "\n")
+                    f.write("Flight Folders: " + str(flight_folders) + "\n")
+                    f.write("User Tags: " + str(user_tags) + "\n")
+                    
+
             geo_ref_list, chunk = setup_psx(user_tags,flight_folders, doc)
             geo_ref_dict[psx] = geo_ref_list
         else:
@@ -1449,8 +1608,8 @@ def main(parg, doc):
         if parg.align:
             #Aactivate last chunk in the list
             chunk_label_list = [chunk.label for chunk in doc.chunks]
-            chunk = activate_chunk(doc, chunk_label_list[-1])
-
+            #chunk = activate_chunk(doc, chunk_label_list[-1])
+            chunk = activate_chunk(doc, 'Raw_Photos')
             # copy active chunk, rename, make active
             align_chunk = chunk.copy()
             align_chunk.label = chunk.label + '_Align'
@@ -1472,7 +1631,7 @@ def main(parg, doc):
                 # write input and output chunk to log file
                 with open(parg.proclogname, 'a') as f:
                     f.write("\n")
-                    f.write("============= AUTO GENERATED PROCESSING LOG TEXT BELOW =============\n")
+                    f.write("============= ALIGNMENT =============\n")
                     f.write("Copied chunk " + chunk.label + " to chunk " + align_chunk.label + "\n")
                     f.write("Geo Ref List: " + str(geo_ref_list) + "\n")
                 # execute function
@@ -1489,7 +1648,8 @@ def main(parg, doc):
         # RECONSTRUCTION UNCERTAINTY
         if parg.ru:
             chunk_label_list = [chunk.label for chunk in doc.chunks]
-            chunk = activate_chunk(doc, chunk_label_list[-1])
+            #chunk = activate_chunk(doc, chunk_label_list[-1])
+            chunk = activate_chunk(doc, 'Raw_Photos_Align')
             # check that chunk has a point cloud
             try:
                 len(chunk.tie_points.points)
@@ -1521,7 +1681,7 @@ def main(parg, doc):
                 # write input and output chunk to log file
                 with open(parg.proclogname, 'a') as f:
                     f.write("\n")
-                    f.write("============= AUTO GENERATED PROCESSING LOG TEXT BELOW =============\n")
+                    f.write("============= RECONSTRUCTION UNCERTAINTY =============\n")
                     f.write("Copied chunk " + chunk.label + " to chunk " + ru_chunk.label + "\n")
                 # execute function
                 reconstruction_uncertainty(ru_chunk, parg.ru_filt_level, parg.ru_cutoff, parg.ru_increment, ru_cam_param,
@@ -1533,8 +1693,8 @@ def main(parg, doc):
         # PROJECTION ACCURACY
         if parg.pa:
             chunk_label_list = [chunk.label for chunk in doc.chunks]
-            chunk = activate_chunk(doc, chunk_label_list[-1])
-
+            #chunk = activate_chunk(doc, chunk_label_list[-1])
+            chunk = activate_chunk(doc, "Raw_Photos_Align_RU10")
             # check that chunk has a point cloud
             try:
                 len(chunk.tie_points.points)
@@ -1564,8 +1724,7 @@ def main(parg, doc):
                 print('Logging to file ' + parg.proclogname)
                 # write input and output chunk to log file
                 with open(parg.proclogname, 'a') as f:
-                    f.write("\n")
-                    f.write("============= AUTO GENERATED PROCESSING LOG TEXT BELOW =============\n")
+                    f.write("\n============= PROJECTION ACCURACY=============\n")
                     f.write("Copied chunk " + chunk.label + " to chunk " + pa_chunk.label + "\n")
                 # execute function
                 projection_accuracy(pa_chunk, parg.pa_filt_level, parg.pa_cutoff, parg.pa_increment, pa_cam_param, log=True,
@@ -1577,7 +1736,8 @@ def main(parg, doc):
         # REPROJECTION ERROR
         if parg.re:
             chunk_label_list = [chunk.label for chunk in doc.chunks]
-            chunk = activate_chunk(doc, chunk_label_list[-1])
+            #chunk = activate_chunk(doc, chunk_label_list[-1])
+            chunk = activate_chunk(doc, "Raw_Photos_Align_RU10_PA2")
             chunk.tiepoint_accuracy = 0.1
             # check that chunk has a point cloud
             try:
@@ -1617,7 +1777,7 @@ def main(parg, doc):
                 # write input and output chunk to log file
                 with open(parg.proclogname, 'a') as f:
                     f.write("\n")
-                    f.write("============= AUTO GENERATED PROCESSING LOG TEXT BELOW =============\n")
+                    f.write("============= REPROJECTION ERROR =============\n")
                     f.write("Copied chunk " + chunk.label + " to chunk " + re_chunk.label + "\n")
                 # execute function, give additional kwargs if re_adapt_cam_opt enabled
                 if parg.re_adapt:
@@ -1641,7 +1801,7 @@ def main(parg, doc):
             print("----------------------------------------------------------------------------------------")
             chunk = doc.chunk
             maxconf = parg.maxconf
-            
+            print("Building Point Clouds")
             chunk_label_list = [chunk.label for chunk in doc.chunks]
             #regex = re.compile(r'_RE\d+\.\d+$') # search for chunks that end with _RE<digits>.<digits>
             #post_error_chunk_list = [chunk for chunk in chunk_label_list if regex.search(chunk)]
@@ -1675,7 +1835,7 @@ def main(parg, doc):
                 print('Logging to file ' + parg.proclogname)
                 # write input and output chunk to log file
                 with open(parg.proclogname, 'a') as f:
-                    f.write("\nPoint CLoud: \n")
+                    f.write("\n==================POINT CLOUD=============================== \n")
                     f.write("Built Dense Cloud and Filtered Point Cloud for chunk " + current_chunk + ".\n")
                     f.write("Point Cloud Quality: High \n")
                     f.write("Point Cloud Filter: Mild \n")
@@ -1718,7 +1878,17 @@ def main(parg, doc):
                     print("File already exists, skipping " + outputDEM + " and " + outputOrtho + " of " + psx_name)
                     continue
                 out_crs, in_crs = exportDEMOrtho(current_chunk, path_to_save_dem = outputDEM, path_to_save_ortho=outputOrtho, geoidPath=geoidPath, ortho_res = parg.ortho_resolution, dem_res = parg.dem_resolution)
-                
+                if parg.log:
+                    # if logging enabled use kwargs
+                    print('Logging to file ' + parg.proclogname)
+                    # write input and output chunk to log file
+                    with open(parg.proclogname, 'a') as f:
+                        f.write("\n")
+                        f.write("Exported DEM and Orthomosaic for chunk: " + current_chunk + ".\n")
+                        f.write("Chunk Metadata: \n")
+                        metadata = chunk.meta
+                        for key, value in metadata.items():
+                            f.write(f"{key}: {value}\n")
             doc.save()
             
             if parg.log:
@@ -1731,10 +1901,19 @@ def main(parg, doc):
                     f.write('PSX File: {}'.format(psx))
                     f.write('\nExported on: {}'.format(datetime.now()))
                     f.write('\nExported Chunks:'.format(pc_chunk_list))
+                    f.write('\nExported to: {}'.format(psx_folder))
 
+                    
                     #f.write('\nChunk CRS: {}'.format(in_crs))
                     #f.write('\nOutput CRS: {}'.format(out_crs))
-
+        processing_end = datetime.now()
+        if parg.log:
+            with open(parg.proclogname, 'a') as f:
+                f.write("\n")
+                f.write("============= PROCESSING END =============\n")
+                f.write("Processing ended at: " + str(processing_end) + "\n")
+                f.write("Processing time: " + str(processing_end - processing_start) + "\n")
+                f.write("============= END OF PROCESSING =============\n")
 
 # execute main() if script call
 if __name__ == '__main__':
