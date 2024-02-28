@@ -36,9 +36,12 @@ chunk = doc.chunk
 #list of chunks
 for chunk in doc.chunks:		
 	chunk_name = chunk.label[:10]
-	#check if label starts with "Raw Photos "
-	if chunk_name != "Raw_Photos":
-		points = chunk.tie_points.points
+	#check if label starts with "Raw_Photos" or "Chunk 1
+	if chunk_name != "Raw_Photos" and chunk_name != "Chunk 1":
+		try:
+			points = chunk.tie_points.points
+		except:
+			continue
 		point_proj = chunk.tie_points.projections
 
 
@@ -53,7 +56,8 @@ for chunk in doc.chunks:
 			R = chunk.transform.scale * T.rotation()
 		else:
 			R = T.rotation()
-
+   
+		print(f"Exporting precision estimates for {chunk_name} to {out_path}")
 		# Open the output file and write the precision estimates to file
 		with open(out_path, "w") as fid:
 			# Open the output file

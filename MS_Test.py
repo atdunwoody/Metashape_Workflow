@@ -2,22 +2,17 @@ import csv
 import math
 
 # Define the input and output file paths
-input_file_path = r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MM_all_102023_pt_prec.txt"
-output_file_path = 'output_file_with_rms.tsv'
+input_file_path = r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023_pt_prec.txt"
 
 # Initialize sums for calculating RMS
 sum_sq_x, sum_sq_y, sum_sq_z = 0, 0, 0
 count = 0
 
 # Open the input file for reading and the output file for writing
-with open(input_file_path, 'r', newline='') as infile, open(output_file_path, 'w', newline='') as outfile:
+with open(input_file_path, 'r', newline='') as infile:
     # Create a CSV reader and writer with tab delimiter
     reader = csv.DictReader(infile, delimiter='\t')
     fieldnames = reader.fieldnames  # No need to add new fields for RMS in the output file
-    writer = csv.DictWriter(outfile, fieldnames=fieldnames, delimiter='\t')
-    
-    # Write the header to the output file
-    writer.writeheader()
     
     # Iterate through each row in the input file
     for row in reader:
@@ -32,7 +27,6 @@ with open(input_file_path, 'r', newline='') as infile, open(output_file_path, 'w
         sum_sq_y += sY
         sum_sq_z += sZ
         # Write the original row to the output file
-        writer.writerow(row)
 
 #Average of the squared standard deviations
 avg_sq_x = sum_sq_x / count
