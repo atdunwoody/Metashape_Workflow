@@ -157,8 +157,9 @@ defaults.flight_folders = [
     #r"Z:\JTM\Wingtra\WingtraPilotProjects\071922 Trip" # UM1, UM2
                            ]         # list of photo folders to process
 defaults.psx_list =[
-    r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LM2_all_102023.psx"
+    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LM2_all_102023.psx"
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023.psx",
+    r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023_all_checked.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MM_all_102023.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\MPM_all_102023.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\UM1_all_102023.psx",
@@ -545,7 +546,10 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
     noptimized = 0
     ndeleted = 0
     ninc_reduced = 0
-
+    round1_max_optimizations = 8
+    round2_max_optimizations = 10
+    RE_round2_tie_point_acc = 0.8
+    
     # get start time for processing log
     starttime = datetime.now()
     # get initial point count
@@ -560,7 +564,9 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                 f.write("============= AUTO GENERATED PROCESSING LOG TEXT BELOW =============\n")
                 f.write("Reprojection Error optimization:\n")
                 f.write("Chunk: " + chunk.label + "\n")
-                f.write("SEUW shoudl be getting closer to 1 every iteration.\n")
+                f.write(f"Performing 1st round of reprojection error using a threshold of {re_filt_level_param}.\n")
+                f.write(f"Each iteration, RE value will be lowered until {re_cutoff*100}% of points are removed or RE threshold is reached.\n")
+                f.write(f"Max {round1_max_optimizations} iterations will be performed in the first round to prevent overfitting.\n")
     SEUWlast = 0
     while True:
         if noptimized > 0:
@@ -592,7 +598,7 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
         print(nselected, " points selected")
         if nselected < 1000:
             break
-        if noptimized > 8: # Don't overfit, break after 8 iterations
+        if noptimized > round1_max_optimizations: # Don't overfit, break after 6 iterations
             break
         npoints = len(points)
         while nselected * (1 / re_cutoff) > npoints:
@@ -658,25 +664,38 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                               tiepoint_covariance = True)
         noptimized = noptimized + 1
         SEUWlast = SEUW
-        print("completed optimization #", noptimized)
-    else:
-        print("If this shows up I don't understand while True loops")
+        print("Completed optimization #", noptimized)
 
+    if 'log' in kwargs:
+            # check that filename defined
+            if 'proclog' in kwargs:
+                # write results to processing log
+                with open(kwargs['proclog'], 'a') as f:
+                    f.write(f"First round completed with {noptimized} optimizations.\n")
+                    f.write(f"Second round of optimizations will begin with a tie point accuracy of 0.08, which will be lowered dynamically if SEUW deviates from 1.\n")
+                    f.write("Optimal SEUW value is 1, and it should be approaching closer to 1 after every iteration.\n")
+                    f.write(f"the RE value will be lowered to {re_cutoff - 0.13} and 10% of tie points will be removed each iteration.\n")
+                    f.write(f"A max of {round2_max_optimizations} iterations will be performed in the second round.\n")
+    
+    chunk.tiepoint_accuracy = RE_round2_tie_point_acc #step 10 in USGS document, lower from 0.1 for WIngtra flights on Peter's suggestion
     #Steps 14 - 18 in USGS document
     noptimized_round2 = 0
     while True:
-            
         metadata = chunk.meta
         SEUW = float(metadata['OptimizeCameras/sigma0'])
+        # SEUW should be getting closer to 1 every iteration, if it's not, lower tie point accuracy to a floor of 0.05
+        if math.fabs(1 - SEUW) > math.fabs(1 - SEUWlast) and noptimized_round2 > 1: #Wait until the second iteration to start lowering the tie point accuracy, SEUW chnages a lot from round1
+            if chunk.tiepoint_accuracy >= 0.05:
+                chunk.tiepoint_accuracy = chunk.tiepoint_accuracy - 0.01    
+                   
         if 'log' in kwargs:
             # check that filename defined
             if 'proclog' in kwargs:
                 # write results to processing log
                 with open(kwargs['proclog'], 'a') as f:
-                    f.write(f"SEUW/Sigma0 value for iteration #{noptimized + noptimized_round2 + 1}: {SEUW:.4f}\n")
-        # SEUW should be getting closer to 1 every iteration, if it's not, break
-        #if math.fabs(1 - SEUW) > math.fabs(1 - SEUWlast): 
-         #   break            
+                    f.write(f"Iteration Number: {noptimized + noptimized_round2 + 1}\n")
+                    f.write(f"     -SEUW/Sigma0 value: {SEUW:.4f}\n")
+                    f.write(f"     -Tie point accuracy: {chunk.tiepoint_accuracy:.2f}\n")
         # define threshold variables
         points = chunk.tie_points.points
         f = Metashape.TiePoints.Filter()
@@ -690,7 +709,7 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
         print(nselected, " points selected")
         if nselected < 1000:
             break
-        if noptimized_round2 > 6:
+        if noptimized_round2 > round2_max_optimizations:
             break
         npoints = len(points)
         while nselected * (1 / re_cutoff) > npoints:
@@ -713,7 +732,12 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
               "% of total points. Ready to delete")
         ndeleted = ndeleted + nselected
         chunk.tie_points.removeSelectedPoints()
-        print("RE", threshold_re, "deleted", nselected, "points")
+        if 'log' in kwargs:
+            # check that filename defined
+            if 'proclog' in kwargs:
+                # write results to processing log
+                with open(kwargs['proclog'], 'a') as f:
+                    f.write(f"RE {threshold_re} deleted  {nselected}  points.\n")
         
         # check if adaptive camera optimization parameters called
         if 'adapt_cam_opt' in kwargs:
@@ -756,7 +780,7 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                               tiepoint_covariance = True)
         noptimized_round2 = noptimized_round2 + 1
         SEUWlast = SEUW
-        print("completed optimization #", noptimized)
+        print("Completed optimization #", noptimized)
     # get end time for processing log
     endtime = datetime.now()
     tdiff = endtime - starttime
@@ -1738,7 +1762,7 @@ def main(parg, doc):
             chunk_label_list = [chunk.label for chunk in doc.chunks]
             #chunk = activate_chunk(doc, chunk_label_list[-1])
             chunk = activate_chunk(doc, "Raw_Photos_Align_RU10_PA2")
-            chunk.tiepoint_accuracy = 0.1
+            
             # check that chunk has a point cloud
             try:
                 len(chunk.tie_points.points)
