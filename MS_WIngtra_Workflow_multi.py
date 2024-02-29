@@ -675,8 +675,9 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
     
     chunk.tiepoint_accuracy = RE_round2_tie_point_acc #step 10 in USGS document, lower from 0.1 for WIngtra flights on Peter's suggestion
     #Steps 14 - 18 in USGS document
-    noptimized_round2 = 1
+    noptimized_round2 = 0
     while True:
+        noptimized_round2 = noptimized_round2 + 1
         metadata = chunk.meta
         SEUW = float(metadata['OptimizeCameras/sigma0'])
         # SEUW should be getting closer to 1 every iteration, if it's not, lower tie point accuracy to a floor of 0.05
@@ -774,9 +775,8 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                               fit_p3=cam_opt_parameters['cal_p3'],
                               fit_p4=cam_opt_parameters['cal_p4'],
                               tiepoint_covariance = True)
-        noptimized_round2 = noptimized_round2 + 1
         SEUWlast = SEUW
-        print("Completed optimization #", noptimized)
+        print("Completed optimization #", noptimized_round2)
     # get end time for processing log
     endtime = datetime.now()
     tdiff = endtime - starttime
