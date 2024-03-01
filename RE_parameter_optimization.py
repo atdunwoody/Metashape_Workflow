@@ -321,12 +321,12 @@ def reconstruction_uncertainty(chunk, ru_filt_level_param, ru_cutoff, ru_increme
     while True:
         # define threshold variables
         points = chunk.tie_points.points
-        f = Metashape.TiePoints.Filter()
+        filter = Metashape.TiePoints.Filter()
         threshold_ru = ru_filt_level_param
         print("initializing with RU =", threshold_ru)
         # initialize filter for RU
-        f.init(chunk, criterion=Metashape.TiePoints.Filter.ReconstructionUncertainty)
-        f.selectPoints(threshold_ru)
+        filter.init(chunk, criterion=Metashape.TiePoints.Filter.ReconstructionUncertainty)
+        filter.selectPoints(threshold_ru)
         # calculate number of selected points
         nselected = len([True for point in points if point.valid is True and point.selected is True])
         print(nselected, " points selected")
@@ -337,7 +337,7 @@ def reconstruction_uncertainty(chunk, ru_filt_level_param, ru_cutoff, ru_increme
             print("RU threshold ", threshold_ru, "selected ", nselected, "/", npoints, "(",
                   round(nselected / npoints * 100, 4), " %) of  points. Adjusting")
             threshold_ru = threshold_ru + ru_increment
-            f.selectPoints(threshold_ru)
+            filter.selectPoints(threshold_ru)
             nselected = len([True for point in points if point.valid is True and point.selected is True])
             # if increment is too large, 0 points will be selected. Adjust increment value downward by 25%. Only do this 10 times before stopping.
             if nselected == 0:
@@ -434,12 +434,12 @@ def projection_accuracy(chunk, pa_filt_level_param, pa_cutoff, pa_increment, cam
     while True:
         # define threshold variables
         points = chunk.tie_points.points
-        f = Metashape.TiePoints.Filter()
+        refilt = Metashape.TiePoints.Filter()
         threshold_pa = pa_filt_level_param
         print("initializing with PA =", threshold_pa)
         # initialize filter for PA
-        f.init(chunk, criterion=Metashape.TiePoints.Filter.ProjectionAccuracy)
-        f.selectPoints(threshold_pa)
+        refilt.init(chunk, criterion=Metashape.TiePoints.Filter.ProjectionAccuracy)
+        refilt.selectPoints(threshold_pa)
         # calculate number of selected points
         nselected = len([True for point in points if point.valid is True and point.selected is True])
         print(nselected, " points selected")
@@ -451,7 +451,7 @@ def projection_accuracy(chunk, pa_filt_level_param, pa_cutoff, pa_increment, cam
             print("PA threshold ", threshold_pa, "selected ", nselected, "/", npoints, "(",
                   round(nselected / npoints * 100, 4), " %) of  points. Adjusting")
             threshold_pa = threshold_pa + pa_increment
-            f.selectPoints(threshold_pa)
+            refilt.selectPoints(threshold_pa)
             nselected = len([True for point in points if point.valid is True and point.selected is True])
             # if increment is too large, 0 points will be selected. Adjust increment value downward by 25%. Only do this 10 times before stopping.
             if nselected == 0:
@@ -519,7 +519,8 @@ def projection_accuracy(chunk, pa_filt_level_param, pa_cutoff, pa_increment, cam
                 f.write("\n")
 
 
-def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_opt_parameters, round1_max_optimizations, round2_max_optimizations, RE_round2_tie_point_acc,  **kwargs):
+def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_opt_parameters, 
+                       round1_max_optimizations, round2_max_optimizations, RE_round2_tie_point_acc, fit_b1, fit_b2, **kwargs):
     """"
     Perform gradual selection on sparse cloud using Reprojection Error ("RE") filter.
     Filter and remove only a percentage (re_cutoff) of overall points in each iteration.
@@ -542,6 +543,7 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
     noptimized = 1
     ndeleted = 0
     ninc_reduced = 0
+    maxSEUWopt = 10
     
     # get start time for processing log
     starttime = datetime.now()
@@ -574,12 +576,12 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
         
         # define threshold variables
         points = chunk.tie_points.points
-        f = Metashape.TiePoints.Filter()
+        refilt = Metashape.TiePoints.Filter()
         threshold_re = re_filt_level_param
         print("initializing with RE =", threshold_re)
         # initialize filter for RE
-        f.init(chunk, criterion=Metashape.TiePoints.Filter.ReprojectionError)
-        f.selectPoints(threshold_re)
+        refilt.init(chunk, criterion=Metashape.TiePoints.Filter.ReprojectionError)
+        refilt.selectPoints(threshold_re)
         # calculate number of selected points
         nselected = len([True for point in points if point.valid is True and point.selected is True])
         print(nselected, " points selected")
@@ -592,7 +594,7 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
             print("RE threshold ", threshold_re, "selected ", nselected, "/", npoints, "(",
                   round(nselected / npoints * 100, 4), " %) of  points. Adjusting")
             threshold_re = threshold_re + re_increment
-            f.selectPoints(threshold_re)
+            refilt.selectPoints(threshold_re)
             nselected = len([True for point in points if point.valid is True and point.selected is True])
             # if increment is too large, 0 points will be selected. Adjust increment value downward by 25%. Only do this 10 times before stopping.
             if nselected == 0:
@@ -615,8 +617,11 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                 # write results to processing log
                 with open(kwargs['proclog'], 'a') as f:
                     f.write(f"Iteration #{noptimized}\n")
-                    f.write(f"     -SEUW: {SEUW:.2f}\n")
                     f.write(f"     -RE threshold: {threshold_re:.2f} deleted {nselected} points, {round(nselected / npoints * 100, 4)} of total points\n")
+                    f.write(f"     -SEUW: {SEUW:.2f}\n")
+                    f.write(f"     -RMSE: {calc_RMS_error(chunk):.2f}\n")
+                    f.write(f"     -Camera Vertical Accuracy: {calc_camera_accuracy(chunk):.2f}\n")
+                    f.write(f"     -Camera Vertical Error: {calc_camera_error(chunk):.2f}\n")
         # check if adaptive camera optimization parameters called
         if 'adapt_cam_opt' in kwargs:
             # if true
@@ -665,9 +670,9 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
             if 'proclog' in kwargs:
                 # write results to processing log
                 with open(kwargs['proclog'], 'a') as f:
-                    f.write(f"\nFirst round completed with {noptimized} optimizations.\n")
-                    f.write(f"Camera optimizations for SEUW optimization will begin.\m")
-                    f.write(f"Camera optimization will be performed until SEUW approaches 1 and camera error is reduced relative to accuracy.\n")
+                    f.write(f"First round completed with {noptimized} optimizations.\n")
+                    f.write(f"\nCamera optimizations for SEUW optimization will begin.\n")
+                    f.write(f"Camera optimization will be performed until SEUW approaches 1\n and camera error is reduced relative to accuracy.\n")
     
     #======================================USGS Step 9==============================================================
     RMSE = calc_RMS_error(chunk)
@@ -676,21 +681,22 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
     
     #======================================USGS Step 10 - 12==============================================================
     
+    
     chunk.tiepoint_accuracy = RE_round2_tie_point_acc #step 10 in USGS document, lower from 0.1 for WIngtra flights on Peter's suggestion
     SEUWlast = 0
     SEUWopt = 1
-    while calc_camera_accuracy(chunk) < calc_camera_error(chunk):
+    while calc_camera_accuracy(chunk) < calc_camera_error(chunk) or math.fabs(SEUW-1) > 0.01:
         metadata = chunk.meta
         SEUW = float(metadata['OptimizeCameras/sigma0'])
         RMSE = calc_RMS_error(chunk)
         # SEUW should be getting closer to 1 every iteration, if it's not, lower tie point accuracy to a floor of 0.05
-        if math.fabs(1 - SEUW) > math.fabs(1 - SEUWlast) and noptimized_round2 > 2: #Wait until the second iteration to start lowering the tie point accuracy, SEUW chnages a lot from round1
-            break
+        #if math.fabs(1 - SEUW) > math.fabs(1 - SEUWlast) and noptimized_round2 > 2: #Wait until the second iteration to start lowering the tie point accuracy, SEUW chnages a lot from round1
+            #break
         chunk.optimizeCameras(fit_f=cam_opt_parameters['cal_f'],
                               fit_cx=cam_opt_parameters['cal_cx'],
                               fit_cy=cam_opt_parameters['cal_cy'],
-                              fit_b1=cam_opt_parameters['cal_b1'],
-                              fit_b2=cam_opt_parameters['cal_b2'],
+                              fit_b1= fit_b1,
+                              fit_b2= fit_b2,
                               fit_k1=cam_opt_parameters['cal_k1'],
                               fit_k2=cam_opt_parameters['cal_k2'],
                               fit_k3=cam_opt_parameters['cal_k3'],
@@ -700,7 +706,10 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                               fit_p3=cam_opt_parameters['cal_p3'],
                               fit_p4=cam_opt_parameters['cal_p4'],
                               tiepoint_covariance = True)
-        SEUWopt += 1
+        
+
+
+        
         if 'log' in kwargs:
             if 'proclog' in kwargs:
                 # write results to processing log
@@ -711,30 +720,33 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                     f.write(f"     -Camera Error: {calc_camera_error(chunk)}\n")
                     f.write(f"     -Camera Accuracy: {calc_camera_accuracy(chunk)}\n")
                     f.write(f"     -RMSE: {RMSE:.4f}\n")
-        if SEUWopt > 10:
+        
+        if chunk.tiepoint_accuracy >= 0.05:
+            chunk.tiepoint_accuracy = chunk.tiepoint_accuracy - chunk.tiepoint_accuracy * 0.2
+        
+        if SEUWopt > maxSEUWopt:
             break
+        SEUWopt += 1
+        
     #======================================USGS Step 14 - 18==============================================================
     if 'log' in kwargs:
         # check that filename defined
         if 'proclog' in kwargs:
             # write results to processing log
             with open(kwargs['proclog'], 'a') as f:
-                f.write(f"Second round of optimizations will begin with a tie point accuracy of {RE_round2_tie_point_acc}, which will be lowered dynamically if SEUW deviates from 1.\n")
+                f.write(F"SEUW optimization completed with {SEUWopt} optimizations.\n")
+                f.write(f"\nSecond round of optimizations will begin with a tie point accuracy of {RE_round2_tie_point_acc}, which will be lowered dynamically if SEUW deviates from 1.\n")
                 f.write("Optimal SEUW value is 1, and it should be approaching closer to 1 after every iteration.\n")
                 f.write(f"the RE value will be lowered to {threshold_re_R2:.2f} and {re_cutoff * 100:.2f}% of tie points will be removed each iteration.\n")
                 f.write(f"A max of {round2_max_optimizations} iterations will be performed in the second round.\n")
     noptimized_round2 = 1
     while True:
-        threshold_re = re_filt_level_param - 0.13
+        threshold_re = re_filt_level_param - 0.2 # set low threshold so 10% of points are removed  every iteration
         metadata = chunk.meta
         SEUW = float(metadata['OptimizeCameras/sigma0'])
         RMSE = calc_RMS_error(chunk)
-        # SEUW should be getting closer to 1 every iteration, if it's not, lower tie point accuracy to a floor of 0.05
-        if math.fabs(1 - SEUW) > math.fabs(1 - SEUWlast) and noptimized_round2 > 2: #Wait until the second iteration to start lowering the tie point accuracy, SEUW chnages a lot from round1
-            if chunk.tiepoint_accuracy >= 0.05:
-                chunk.tiepoint_accuracy = chunk.tiepoint_accuracy - 0.01    
         
-        if RMSE < 0.17:
+        if RMSE < 0.16:
             break
         
         if 'log' in kwargs:
@@ -744,21 +756,21 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                 with open(kwargs['proclog'], 'a') as f:
                     f.write(f"Iteration Number: {noptimized + noptimized_round2}\n")
                     f.write(f"     -SEUW/Sigma0 value: {SEUW:.4f}\n")
-                    f.write(f"     -Tie point accuracy: {chunk.tiepoint_accuracy:.2f}\n")
+                    f.write(f"     -Camera Error: {calc_camera_error(chunk)}\n")
+                    f.write(f"     -Camera Accuracy: {calc_camera_accuracy(chunk)}\n")
                     f.write(f"     -RMSE: {RMSE:.4f}\n")
         # define threshold variables
         points = chunk.tie_points.points
-        f = Metashape.TiePoints.Filter()
+        refilt = Metashape.TiePoints.Filter()
        
         print("initializing with RE =", threshold_re)
         # initialize filter for RE
-        f.init(chunk, criterion=Metashape.TiePoints.Filter.ReprojectionError)
-        f.selectPoints(threshold_re)
+        refilt.init(chunk, criterion=Metashape.TiePoints.Filter.ReprojectionError)
+        refilt.selectPoints(threshold_re)
         # calculate number of selected points
         nselected = len([True for point in points if point.valid is True and point.selected is True])
         print(nselected, " points selected")
-        if nselected < 1000:
-            break
+
         if noptimized_round2 > round2_max_optimizations:
             break
         npoints = len(points)
@@ -766,7 +778,7 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
             print("RE threshold ", threshold_re, "selected ", nselected, "/", npoints, "(",
                   round(nselected / npoints * 100, 4), " %) of  points. Adjusting")
             threshold_re = threshold_re + re_increment
-            f.selectPoints(threshold_re)
+            refilt.selectPoints(threshold_re)
             nselected = len([True for point in points if point.valid is True and point.selected is True])
             # if increment is too large, 0 points will be selected. Adjust increment value downward by 25%. Only do this 10 times before stopping.
             if nselected == 0:
@@ -788,7 +800,7 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
             if 'proclog' in kwargs:
                 # write results to processing log
                 with open(kwargs['proclog'], 'a') as f:
-                    f.write(f"RE {threshold_re:.2f} deleted {nselected} points.\n")
+                    f.write(f"RE {threshold_re:.2f} deleted {nselected} points {round(nselected / npoints * 100, 4)}% of total points\n")
                     
         
         
@@ -844,9 +856,9 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
     print('Reprojection Error optimization completed.\n' +
           str(ndeleted) + ' of ' + str(init_pointcount) + ' removed in ' + str(
         noptimized) + ' optimizations on chunk "' + chunk.label + '".\n')
-    f.init(chunk, criterion=Metashape.TiePoints.Filter.ReprojectionError)
-    f.selectPoints(threshold_re)
-    f.resetSelection()
+    refilt.init(chunk, criterion=Metashape.TiePoints.Filter.ReprojectionError)
+    refilt.selectPoints(threshold_re)
+    refilt.resetSelection()
     # Check if logging option enabled
     if 'log' in kwargs:
         # check that filename defined
@@ -856,7 +868,13 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                
                 f.write(str(ndeleted) + " of " + str(init_pointcount) + " removed in " + str(
                     noptimized + noptimized_round2 + 1) + " optimizations.\n")
+                f.write(f"Tie Point Accuracy: {chunk.tiepoint_accuracy:.2f}\n")
+                f.write(f"Round 1: {noptimized} optimizations, Round 2: {noptimized_round2} optimizations.\n")
+                f.write(f"Final Camera Error: {calc_camera_error(chunk):.2f}\n")
                 f.write(f"Final SEUW: {SEUW:.3f}\n")
+                f.write(f"Fit Param b1: {fit_b1}  b2: {fit_b2}\n")
+                f.write(f"Final RMSE: {calc_RMS_error(chunk):.2f}\n")  
+                f.write(f"Forumula for lowering tiepoint accuracy: if chunk.tiepoint_accuracy >= 0.05:\n       chunk.tiepoint_accuracy = chunk.tiepoint_accuracy - chunk.tiepoint_accuracy * 0.2") 
                 f.write("Final point count: " + str(end_pointcount) + "\n")
                 f.write("Final Reprojection Error: " + str(threshold_re) + ".\n")
                 f.write('Final camera lens calibration parameters: ' + ', '.join(
@@ -1890,76 +1908,84 @@ def main(parg, doc):
         if parg.re:
             chunk_label_list = [chunk.label for chunk in doc.chunks]
             #chunk = activate_chunk(doc, chunk_label_list[-1])
-            round1_max_optimizations = [5, 10, 15]
-            round2_max_optimizations = [5, 10]
-            RE_round2_tie_point_acc = [0.06, 0.08, 0.1, 0.3]
+            round1_max_optimizations = [10]
+            round2_max_optimizations = [10]
+            RE_round2_tie_point_acc = [0.08, 0.09, 0.1]
+            fit_params = [[False, False], [True, True]]
             SEUW_dict = {}
             RMSE_dict = {}
             for R2_TP_acc in RE_round2_tie_point_acc:
                 for R1_opt in round1_max_optimizations:
                     for R2_opt in round2_max_optimizations:
-                        chunk = activate_chunk(doc, "Raw_Photos_Align_RU10_PA2")
-                        
-                        # check that chunk has a point cloud
-                        try:
-                            len(chunk.tie_points.points)
-                        except AttributeError:
-                            # print exception so it will be visible in console
-                            print('AttributeError: Chunk "' + chunk.label + '" has no point cloud. Ensure that image '
-                                                                            'alignment was performed. Stopping execution.')
-                            raise AttributeError('Chunk "' + chunk.label + '" has no point cloud. Ensure that image alignment '
-                                                                        'was performed. Stopping execution.')
+                        for b1_fit, b2_fit in fit_params:
+                            chunk = activate_chunk(doc, "Raw_Photos_Align_RU10_PA2")
+                            
+                            # check that chunk has a point cloud
+                            try:
+                                len(chunk.tie_points.points)
+                            except AttributeError:
+                                # print exception so it will be visible in console
+                                print('AttributeError: Chunk "' + chunk.label + '" has no point cloud. Ensure that image '
+                                                                                'alignment was performed. Stopping execution.')
+                                raise AttributeError('Chunk "' + chunk.label + '" has no point cloud. Ensure that image alignment '
+                                                                            'was performed. Stopping execution.')
 
-                        # copy active chunk, rename, make active
-                        re_chunk = chunk.copy()
-                        re_chunk.label = chunk.label + '_RE' + str(parg.re_filt_level) + '_TPacc' + str(R2_TP_acc) + '_R1opt' + str(R1_opt) + '_R2opt' + str(R2_opt)
-                        print('Copied chunk ' + chunk.label + ' to chunk ' + re_chunk.label)
+                            # copy active chunk, rename, make active
+                            re_chunk = chunk.copy()
+                            re_chunk.label = chunk.label + '_RE' + str(parg.re_filt_level) + '_dynamic_TPacc' + str(R2_TP_acc) + '_R1opt' + str(R1_opt) + '_R2opt' + str(R2_opt)
+                            re_chunk.label = f"{re_chunk.label}_RE{parg.re_filt_level}_b1{b1_fit}_b2_{b2_fit}_dynamic_TPacc{R2_TP_acc}_R1opt{R1_opt}_R2opt{R2_opt}"
+                            print('Copied chunk ' + chunk.label + ' to chunk ' + re_chunk.label)
 
-                        # Set INITIAL camera optimization parameters.
-                        # make a dictionary of camera opt params using arguments from parg
-                        re_cam_param = blank_cam_opt_parameters.copy()
-                        # loop through all cam parameters in parg list and set called params to True
-                        for elem in parg.re_cam_opt_param:
-                            re_cam_param['cal_{}'.format(elem)] = True
-
-                        # if re_adapt_camera, make cam_param for that also
-                        if parg.re_adapt:
+                            # Set INITIAL camera optimization parameters.
                             # make a dictionary of camera opt params using arguments from parg
-                            re_adapted_cam_param = blank_cam_opt_parameters.copy()
+                            re_cam_param = blank_cam_opt_parameters.copy()
                             # loop through all cam parameters in parg list and set called params to True
-                            for elem in parg.re_adapted_cam_param:
-                                re_adapted_cam_param['cal_{}'.format(elem)] = True
+                            for elem in parg.re_cam_opt_param:
+                                re_cam_param['cal_{}'.format(elem)] = True
 
-                        # Run Reprojection Error using reprojection_error function
-                        print('Running Reprojection Error optimization')
-                        if parg.log:
-                            # if logging enabled use kwargs
-                            print('Logging to file ' + parg.proclogname)
-                            # write input and output chunk to log file
-                            with open(parg.proclogname, 'a') as f:
-                                f.write("\n")
-                                f.write(f"============= REPROJECTION ERROR =============\n")
-                                f.write(f"Number of round 1 optimizations: {R1_opt}\n")
-                                f.write(f"Number of round 2 optimizations: {R2_opt}\n")
-                                f.write(f"Round 2 Tie Point Accuracy: {R2_TP_acc}\n")
-                                f.write("Copied chunk " + chunk.label + " to chunk " + re_chunk.label + "\n")
-                            # execute function, give additional kwargs if re_adapt_cam_opt enabled
+                            # if re_adapt_camera, make cam_param for that also
                             if parg.re_adapt:
-                                reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, R1_opt, R2_opt, R2_TP_acc, log=True,
-                                            proclog=parg.proclogname, adapt_cam_opt=parg.re_adapt, adapt_cam_level=parg.re_adapt_level,
-                                            adapt_cam_param=re_adapted_cam_param)
+                                # make a dictionary of camera opt params using arguments from parg
+                                re_adapted_cam_param = blank_cam_opt_parameters.copy()
+                                # loop through all cam parameters in parg list and set called params to True
+                                for elem in parg.re_adapted_cam_param:
+                                    re_adapted_cam_param['cal_{}'.format(elem)] = True
+
+                            # Run Reprojection Error using reprojection_error function
+                            print('Running Reprojection Error optimization')
+                            if parg.log:
+                                # if logging enabled use kwargs
+                                print('Logging to file ' + parg.proclogname)
+                                # write input and output chunk to log file
+                                with open(parg.proclogname, 'a') as f:
+                                    f.write("\n")
+                                    f.write(f"============= REPROJECTION ERROR =============\n")
+                                    f.write(f"Number of round 1 optimizations: {R1_opt}\n")
+                                    f.write(f"Number of round 2 optimizations: {R2_opt}\n")
+                                    f.write(f"Round 2 Tie Point Accuracy: {R2_TP_acc}\n")
+                                    f.write(f"Fit Parameters: b1: {b1_fit}, b2: {b2_fit}\n")
+                                    f.write("Copied chunk " + chunk.label + " to chunk " + re_chunk.label + "\n")
+                                # execute function, give additional kwargs if re_adapt_cam_opt enabled
+                                if parg.re_adapt:
+                                    SEUW, RMSE = reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, 
+                                                                    R1_opt, R2_opt, R2_TP_acc,  b1_fit, b2_fit, log=True,
+                                                                    proclog=parg.proclogname, adapt_cam_opt=parg.re_adapt, adapt_cam_level=parg.re_adapt_level,
+                                                                    adapt_cam_param=re_adapted_cam_param)
+                                else:
+                                    SEUW, RMSE = reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, 
+                                                                    R1_opt, R2_opt, R2_TP_acc, b1_fit, b2_fit, log=True,
+                                                                    proclog=parg.proclogname)
                             else:
-                                SEUW, RMSE = reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, R1_opt, R2_opt, R2_TP_acc, log=True,
-                                            proclog=parg.proclogname)
-                        else:
-                            if parg.re_adapt:
-                                reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, R1_opt, R2_opt, R2_TP_acc, 
-                                                adapt_cam_opt=parg.re_adapt, adapt_cam_level=parg.re_adapt_level,
-                                                adapt_cam_param=re_adapted_cam_param)
-                            else:
-                                reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, R1_opt, R2_opt, R2_TP_acc,)
-                        SEUW_dict[re_chunk.label] = SEUW
-                        doc.save()
+                                if parg.re_adapt:
+                                    SEUW, RMSE = reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, 
+                                                                    R1_opt, R2_opt, R2_TP_acc,  b1_fit, b2_fit,
+                                                                    adapt_cam_opt=parg.re_adapt, adapt_cam_level=parg.re_adapt_level,
+                                                                    adapt_cam_param=re_adapted_cam_param)
+                                else:
+                                    SEUW, RMSE = reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, R1_opt, R2_opt, R2_TP_acc,
+                                                                     b1_fit, b2_fit)
+                            SEUW_dict[re_chunk.label] = SEUW
+                            doc.save()
             print(SEUW_dict)
             print(RMSE_dict)
             if parg.log:

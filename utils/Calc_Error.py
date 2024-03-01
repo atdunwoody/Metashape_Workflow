@@ -1,5 +1,6 @@
 import Metashape, math
 import time
+import csv
 
 def calc_camera_error(chunk):
      T = chunk.transform.matrix
@@ -17,7 +18,7 @@ def calc_camera_error(chunk):
           error = error.norm()
           sums += error**2
           num += 1
-     print(math.sqrt(sums / num))
+     return (math.sqrt(sums / num))
 
 def calc_RMS(chunk):
      tie_points= chunk.tie_points
@@ -55,4 +56,48 @@ def calc_RMS(chunk):
 				
      sigma = math.sqrt(err_sum / num)
      return (sigma) # can also add math.sqrt(maxe) to return statement to get the max error 
+
+def calc_camera_accuracy(chunk):
+    # Returns the average vertical accuracy of the camera reference locations in the chunk
+    chunk = Metashape.app.document.chunk #active chunk
+    sums = 0
+    num = 0
+    for camera in chunk.cameras:
+        if not camera.transform:
+            continue
+        if not camera.reference.location:
+            continue
+        camera_acc = camera.reference.accuracy[2] # Change index to 0 and 1 for lateral accuracy
+        sums += camera_acc
+        num += 1
+    return sums / num
+
+doc = Metashape.app.document
+doc.save()
+chunkdict = {}
+#provide labels for SEUW, acc and error in chunk dict
+chunkdict['label'] = ['SEUW', 'Accuracy', 'Camera Error']
+
+for chunk in doc.chunks[4:]:
+     try:
+          metadata = chunk.meta
+          SEUW = float(metadata['OptimizeCameras/sigma0'])
+          accuracy = calc_camera_accuracy(chunk)
+          cam_error = calc_camera_error(chunk)
+          label = chunk.label[25:]
+          chunkdict[label] = [SEUW, accuracy, cam_error]
+          print(f"Chunk info for {label}:   SEUW: {SEUW}, Accuracy: {accuracy}, Camera Error: {cam_error}")
+     except:
+          print(f"Error with chunk {chunk.label}")
+
+# Write the results to a CSV file
+output_file = doc.path[0:(len(doc.path)-4)] + '_chunk_info.csv'
+with open(output_file, "w") as fid:
+     fwriter = csv.writer(fid, delimiter=',', lineterminator='\n')
+     fwriter.writerow(chunkdict['label'])
+     for key in chunkdict.keys():
+          if key != 'label':
+               fwriter.writerow([key] + chunkdict[key])
+               
+
 
