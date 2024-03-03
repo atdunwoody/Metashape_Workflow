@@ -18,6 +18,8 @@ def calc_camera_error(chunk):
           error = error.norm()
           sums += error**2
           num += 1
+     if num == 0:
+          return 0
      return (math.sqrt(sums / num))
 
 def calc_RMS(chunk):
@@ -53,7 +55,8 @@ def calc_RMS(chunk):
                else:
                     point_errors[point_id].append(error)
                if error > maxe: maxe = error
-				
+     if num == 0:
+          return 0		
      sigma = math.sqrt(err_sum / num)
      return (sigma) # can also add math.sqrt(maxe) to return statement to get the max error 
 
@@ -70,6 +73,9 @@ def calc_camera_accuracy(chunk):
         camera_acc = camera.reference.accuracy[2] # Change index to 0 and 1 for lateral accuracy
         sums += camera_acc
         num += 1
+     
+    if num == 0:
+          return 0
     return sums / num
 
 doc = Metashape.app.document
@@ -78,17 +84,14 @@ chunkdict = {}
 #provide labels for SEUW, acc and error in chunk dict
 chunkdict['label'] = ['SEUW', 'Accuracy', 'Camera Error']
 
-for chunk in doc.chunks[4:]:
-     try:
-          metadata = chunk.meta
-          SEUW = float(metadata['OptimizeCameras/sigma0'])
-          accuracy = calc_camera_accuracy(chunk)
-          cam_error = calc_camera_error(chunk)
-          label = chunk.label[25:]
-          chunkdict[label] = [SEUW, accuracy, cam_error]
-          print(f"Chunk info for {label}:   SEUW: {SEUW}, Accuracy: {accuracy}, Camera Error: {cam_error}")
-     except:
-          print(f"Error with chunk {chunk.label}")
+for chunk in doc.chunks[:]:
+     metadata = chunk.meta
+     SEUW = metadata['OptimizeCameras/sigma0']
+     accuracy = calc_camera_accuracy(chunk)
+     cam_error = calc_camera_error(chunk)
+     label = chunk.label
+     chunkdict[label] = [SEUW, accuracy, cam_error]
+     print(f"Chunk info for {label}:   SEUW: {SEUW}, Accuracy: {accuracy}, Camera Error: {cam_error}")
 
 # Write the results to a CSV file
 output_file = doc.path[0:(len(doc.path)-4)] + '_chunk_info.csv'
