@@ -57,7 +57,7 @@ def calc_RMS(chunk):
                if error > maxe: maxe = error
      if num == 0:
           return 0		
-     sigma = math.sqrt(err_sum / num)
+     sigma = math.sqrt(err_sum) / num
      return (sigma) # can also add math.sqrt(maxe) to return statement to get the max error 
 
 def calc_camera_accuracy(chunk):

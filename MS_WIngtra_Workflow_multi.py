@@ -159,7 +159,8 @@ defaults.flight_folders = [
 defaults.psx_list =[
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LM2_all_102023.psx"
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023.psx",
-    r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023_all_checked.psx",
+    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023_all_checked.psx",
+    r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\Low_CoReg_All.psx"
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023_last_checked.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MM_all_102023.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\MPM_all_102023.psx",
@@ -1694,8 +1695,11 @@ def main(parg, doc):
                 f.write("============= PROCESSING START =============\n")
                 f.write("Processing started at: " + str(processing_start) + "\n")
                 f.write("Processing PSX: " + psx_file + "\n")
-        doc.save()
-        doc.open(psx_file)
+        try:
+            doc.save()
+            doc.open(psx_file)
+        except:
+            doc.open(psx_file)
         # Get the active chunk
         doc = Metashape.app.document
         if parg.setup==False and parg.align==False and parg.ru==False and parg.pa==False and parg.re==False and parg.pcbuild==False and parg.build==False:
@@ -1899,9 +1903,9 @@ def main(parg, doc):
             chunk_label_list = [chunk.label for chunk in doc.chunks]
             #chunk = activate_chunk(doc, chunk_label_list[-1])
             chunk = activate_chunk(doc, "Raw_Photos_Align_RU10_PA3")
-            R1_opt = 5 # number of optimizations for round 1
-            R2_opt = 5 # number of optimizations for round 2
-            R2_TPA_ls = [0.1, 0.13, 0.15, 0.2]
+            R1_opt = 10 # number of optimizations for round 1
+            R2_opt = 7 # number of optimizations for round 2
+            R2_TPA_ls = [0.07, 0.1]
             SEUW_dict = {}
             RMSE_dict = {}
             # check that chunk has a point cloud
