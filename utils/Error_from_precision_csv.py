@@ -39,7 +39,7 @@ def calc_precision_error(input_file_path):
     result = [avg_sq_x, avg_sq_y, avg_sq_z]
     return result
 
-input_folder = r"M:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\RE_Testing_Precision_Estimates\Apadt_Params"
+input_folder = r"Z:\JTM\Metashape"
 results_dict = {}
 
 for file in os.listdir(input_folder):
