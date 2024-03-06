@@ -160,6 +160,7 @@ defaults.psx_list =[
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LM2_all_102023.psx"
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023_all_checked.psx",
+    r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\Low_CoReg_All.psx"
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023_last_checked.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MM_all_102023.psx",
     r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\MM_all_102023_align60k.psx",
@@ -1713,7 +1714,11 @@ def main(parg, doc):
                 f.write("============= PROCESSING START =============\n")
                 f.write("Processing started at: " + str(processing_start) + "\n")
                 f.write("Processing PSX: " + psx_file + "\n")
-        doc.open(psx_file)
+        try:
+            doc.save()
+            doc.open(psx_file)
+        except:
+            doc.open(psx_file)
         # Get the active chunk
         doc = Metashape.app.document
         if parg.setup==False and parg.align==False and parg.ru==False and parg.pa==False and parg.re==False and parg.pcbuild==False and parg.build==False:
@@ -1916,70 +1921,71 @@ def main(parg, doc):
         if parg.re:
             chunk_label_list = [chunk.label for chunk in doc.chunks]
             #chunk = activate_chunk(doc, chunk_label_list[-1])
-            chunk = activate_chunk(doc, "Raw_Photos_Align_RU10_PA2")
+            chunk = activate_chunk(doc, "Raw_Photos_Align_RU10_PA3")
             R1_opt = 10 # number of optimizations for round 1
-            R2_opt = 5 # number of optimizations for round 2
-            R2_TPA = 0.1
+            R2_opt = 7 # number of optimizations for round 2
+            R2_TPA_ls = [0.07, 0.1]
             SEUW_dict = {}
             RMSE_dict = {}
             # check that chunk has a point cloud
-            try:
-                len(chunk.tie_points.points)
-            except AttributeError:
-                # print exception so it will be visible in console
-                print('AttributeError: Chunk "' + chunk.label + '" has no point cloud. Ensure that image '
-                                                                'alignment was performed. Stopping execution.')
-                raise AttributeError('Chunk "' + chunk.label + '" has no point cloud. Ensure that image alignment '
-                                                            'was performed. Stopping execution.')
+            for R2_TPA in R2_TPA_ls:
+                try:
+                    len(chunk.tie_points.points)
+                except AttributeError:
+                    # print exception so it will be visible in console
+                    print('AttributeError: Chunk "' + chunk.label + '" has no point cloud. Ensure that image '
+                                                                    'alignment was performed. Stopping execution.')
+                    raise AttributeError('Chunk "' + chunk.label + '" has no point cloud. Ensure that image alignment '
+                                                                'was performed. Stopping execution.')
 
-            # copy active chunk, rename, make active
-            label = chunk.label
-            re_chunk = chunk.copy()
-            re_chunk.label = f"{label}_RE{parg.re_filt_level}_test"
-            print('Copied chunk ' + chunk.label + ' to chunk ' + re_chunk.label)
+                # copy active chunk, rename, make active
+                label = chunk.label
+                re_chunk = chunk.copy()
+                re_chunk.label = f"{label}_RE{parg.re_filt_level}_TPA{R2_TPA}"
+                print('Copied chunk ' + chunk.label + ' to chunk ' + re_chunk.label)
 
-            # Set INITIAL camera optimization parameters.
-            # make a dictionary of camera opt params using arguments from parg
-            re_cam_param = blank_cam_opt_parameters.copy()
-            # loop through all cam parameters in parg list and set called params to True
-            for elem in parg.re_cam_opt_param:
-                re_cam_param['cal_{}'.format(elem)] = True
-
-            # if re_adapt_camera, make cam_param for that also
-            if parg.re_adapt:
+                # Set INITIAL camera optimization parameters.
                 # make a dictionary of camera opt params using arguments from parg
-                re_adapted_cam_param = blank_cam_opt_parameters.copy()
+                re_cam_param = blank_cam_opt_parameters.copy()
                 # loop through all cam parameters in parg list and set called params to True
-                for elem in parg.re_adapted_cam_param:
-                    re_adapted_cam_param['cal_{}'.format(elem)] = True
+                for elem in parg.re_cam_opt_param:
+                    re_cam_param['cal_{}'.format(elem)] = True
 
-            # Run Reprojection Error using reprojection_error function
-            print('Running Reprojection Error optimization')
-            if parg.log:
-                # if logging enabled use kwargs
-                print('Logging to file ' + parg.proclogname)
-                # write input and output chunk to log file
-                with open(parg.proclogname, 'a') as f:
-                    f.write("\n")
-                    f.write("============= REPROJECTION ERROR =============\n")
-                    f.write("Copied chunk " + chunk.label + " to chunk " + re_chunk.label + "\n")
-                # execute function, give additional kwargs if re_adapt_cam_opt enabled
+                # if re_adapt_camera, make cam_param for that also
                 if parg.re_adapt:
-                    reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, R1_opt, R2_opt, R2_TPA, log=True,
-                                proclog=parg.proclogname, adapt_cam_opt=parg.re_adapt, adapt_cam_level=parg.re_adapt_level,
-                                adapt_cam_param=re_adapted_cam_param)
-                else:
-                    reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, R1_opt, R2_opt, R2_TPA, log=True,
-                                proclog=parg.proclogname)
-            else:
-                if parg.re_adapt:
-                    reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, 
-                                    R1_opt, R2_opt, R2_TPA, adapt_cam_opt=parg.re_adapt, adapt_cam_level=parg.re_adapt_level,
+                    # make a dictionary of camera opt params using arguments from parg
+                    re_adapted_cam_param = blank_cam_opt_parameters.copy()
+                    # loop through all cam parameters in parg list and set called params to True
+                    for elem in parg.re_adapted_cam_param:
+                        re_adapted_cam_param['cal_{}'.format(elem)] = True
+
+                # Run Reprojection Error using reprojection_error function
+                print('Running Reprojection Error optimization')
+                if parg.log:
+                    # if logging enabled use kwargs
+                    print('Logging to file ' + parg.proclogname)
+                    # write input and output chunk to log file
+                    with open(parg.proclogname, 'a') as f:
+                        f.write("\n")
+                        f.write("============= REPROJECTION ERROR =============\n")
+                        f.write("Copied chunk " + chunk.label + " to chunk " + re_chunk.label + "\n")
+                    # execute function, give additional kwargs if re_adapt_cam_opt enabled
+                    if parg.re_adapt:
+                        reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, R1_opt, R2_opt, R2_TPA, log=True,
+                                    proclog=parg.proclogname, adapt_cam_opt=parg.re_adapt, adapt_cam_level=parg.re_adapt_level,
                                     adapt_cam_param=re_adapted_cam_param)
+                    else:
+                        reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, R1_opt, R2_opt, R2_TPA, log=True,
+                                    proclog=parg.proclogname)
                 else:
-                    reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, R1_opt, R2_opt, R2_TPA,)
-        
-            doc.save()
+                    if parg.re_adapt:
+                        reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, 
+                                        R1_opt, R2_opt, R2_TPA, adapt_cam_opt=parg.re_adapt, adapt_cam_level=parg.re_adapt_level,
+                                        adapt_cam_param=re_adapted_cam_param)
+                    else:
+                        reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, R1_opt, R2_opt, R2_TPA,)
+            
+                doc.save()
 
         if parg.pcbuild:
             print("----------------------------------------------------------------------------------------")
