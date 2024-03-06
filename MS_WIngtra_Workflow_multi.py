@@ -159,9 +159,10 @@ defaults.flight_folders = [
 defaults.psx_list =[
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LM2_all_102023.psx"
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023.psx",
-    r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023_all_checked.psx",
+    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023_all_checked.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023_last_checked.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MM_all_102023.psx",
+    r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\MM_all_102023_align60k.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\MPM_all_102023.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\UM1_all_102023.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\UM2_all_102023.psx",
@@ -268,16 +269,16 @@ def align_images(chunk):
     # Define alignment parameters
     alignment_params = {
         #Set Accuracy to high
-        "downscale": "High",
+        "downscale": 2,
         "generic_preselection": True,
         "reference_preselection": True,
         "reference_preselection_mode": Metashape.ReferencePreselectionSource,
         "filter_mask": False,
         "mask_tiepoints": True,
         "filter_stationary_points": True,
-        "keypoint_limit": 40000,
+        "keypoint_limit": 60000,
         "keypoint_limit_per_mpx": 1000,
-        "tiepoint_limit": 4000,
+        "tiepoint_limit": 0,
         "keep_keypoints": False,
         "guided_matching": False,
         "reset_matches": False,
@@ -286,7 +287,11 @@ def align_images(chunk):
         "workitem_size_pairs": 80,
         "max_workgroup_size": 100
     }
-    
+    for camera in chunk.cameras:
+        if camera.reference.location:
+            camera.reference.location_enabled = True
+        if camera.reference.rotation:
+            camera.reference.rotation_enabled = True
     # Perform image matching and alignment
     chunk.matchPhotos(**alignment_params)
     chunk.alignCameras()
@@ -850,6 +855,20 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
     refilt.init(chunk, criterion=Metashape.TiePoints.Filter.ReprojectionError)
     refilt.selectPoints(threshold_re)
     refilt.resetSelection()
+    chunk.optimizeCameras(fit_f=cam_opt_parameters['cal_f'],
+                        fit_cx=cam_opt_parameters['cal_cx'],
+                        fit_cy=cam_opt_parameters['cal_cy'],
+                        fit_k1=cam_opt_parameters['cal_k1'],
+                        fit_k2=cam_opt_parameters['cal_k2'],
+                        fit_k3=cam_opt_parameters['cal_k3'],
+                        fit_k4=cam_opt_parameters['cal_k4'],
+                        fit_p1=cam_opt_parameters['cal_p1'],
+                        fit_p2=cam_opt_parameters['cal_p2'],
+                        fit_p3=cam_opt_parameters['cal_p3'],
+                        fit_p4=cam_opt_parameters['cal_p4'],
+                        tiepoint_covariance = True.
+                        fit_corrections = True
+                        )
     # Check if logging option enabled
     if 'log' in kwargs:
         # check that filename defined
