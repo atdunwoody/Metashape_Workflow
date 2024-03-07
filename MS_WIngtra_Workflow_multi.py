@@ -160,7 +160,7 @@ defaults.psx_list =[
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LM2_all_102023.psx"
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023_all_checked.psx",
-    r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\Low_CoReg_All.psx"
+    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\Low_CoReg_All.psx"
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023_last_checked.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MM_all_102023.psx",
     r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\MM_all_102023_align60k.psx",
@@ -170,18 +170,38 @@ defaults.psx_list =[
     
 ]
 defaults.geoid = r"Z:\JTM\Metashape\us_noaa_g2018u0.tif"              # path to geoid file
-defaults.dem_resolution = 0.045
-defaults.ortho_resolution = 0.0225
+defaults.dem_resolution = 0
+defaults.ortho_resolution = 0
 # ------------Alignment defaults -------------------------------------------------------
 defaults.setup = False              # run MS_PSX_Setup.py
 defaults.pcbuild = False            # run MS_Build_PointCloud.py
 defaults.build = False             # run MS_Build_Products.py
 defaults.align = False              # run image alignment
-defaults.align_accuracy = 'high'    # image alignment accuracy (must be: 'highest', 'high', 'medium', 'low', 'lowest'
-defaults.keypointlimit = 40000     # alignment keypointlimit (0 = unlimited)
-defaults.tiepointlimit = 4000         # alignment tiepointlimit (0 = unlimited)
+defaults.align_accuracy = 'High'    # image alignment accuracy (must be: 'highest', 'high', 'medium', 'low', 'lowest'
+defaults.keypointlimit = 60000     # alignment keypointlimit (0 = unlimited)
+defaults.tiepointlimit = 0        # alignment tiepointlimit (0 = unlimited)
 defaults.gen_preselect = True       # alignment generic preselection
 defaults.ref_preselect = False      # alignment reference preselection
+defaults.alignment_params = {
+        "downscale": 1, # 0 = Highest, 1 = High, 2 = Medium, 3 = Low, 4 = Lowest
+        "generic_preselection": True, # Default is True, speeds up alignment
+        "reference_preselection": True, #Default is True, reference preselection enabled
+        #Commented out below because it is default parameter and Python can't pickle the Metashape.ReferencePreselectionSource object
+        #"reference_preselection_mode": Metashape.ReferencePreselectionSource, # Source uses reference coordinates
+        "filter_mask": False,
+        "mask_tiepoints": True,
+        "filter_stationary_points": True,
+        "keypoint_limit": 60000, #Default = 40000, 60000 for high quality images 
+        "keypoint_limit_per_mpx": 1000,
+        "tiepoint_limit": 10000, #Default = 4000, 10000 for high quality images
+        "keep_keypoints": False,
+        "guided_matching": True,
+        "reset_matches": False,
+        "subdivide_task": True,
+        "workitem_size_cameras": 20,
+        "workitem_size_pairs": 80,
+        "max_workgroup_size": 100
+    }
 # alignment camera optimization parameters
 defaults.al_cam_opt_param = ['f','cx','cy','k1','k2','k3','p1','p2']
 
@@ -203,7 +223,7 @@ defaults.re_filt_level = 0.3        # re gradual selection filter level (default
 # re camera optimization parameters
 defaults.re_cam_opt_param = ['f','cx','cy','k1','k2','k3','p1','p2']
 # adjust camera optimization parameters when RE level is below threshold
-defaults.re_adapt = True            # enable adaptive camera opt params (default=True)
+defaults.re_adapt = False            # enable adaptive camera opt params (default=True)
 defaults.re_adapt_level = 1         # RE level at which to adjust camera opt params (default=1)
 # re adjust camera optimization parameters. These are enabled and added to initial re_cam_opt_param
 defaults.re_adapt_add_cam_param = []
@@ -215,12 +235,12 @@ defaults.proclogname = 'default.txt'
 
 # ------------ru, pa, re iteration defaults -------------------------------------------
 # Only change these if you know what you're doing.-------------------------------------
-defaults.ru_cutoff = 0.25           # percentage of points removed in single RU iteration [0.25]
+defaults.ru_cutoff = 0.50           # percentage of points removed in single RU iteration [0.50]
 defaults.pa_cutoff = 0.50           # percentage of points removed in single PA iteration [0.50]
 defaults.re_cutoff = 0.10           # percentage of points removed in single RE iteration [0.10]
 # Changing these values may result in infinite loops
 defaults.ru_increment = 1           # increment by which RU filter advanced when finding RU level to select ru_cutoff percentage [1]
-defaults.pa_increment = 0.5         # increment by which PA filter advanced when finding PA level to select pa_cutoff percentage [0.5]
+defaults.pa_increment = 0.2         # increment by which PA filter advanced when finding PA level to select pa_cutoff percentage [0.2]
 defaults.re_increment = 0.01        # increment by which RE filter advanced when finding RE level to select re_cutoff percentage [0.01]
 
 #-------------------Build Products defaults--------------------------------------------
@@ -259,40 +279,14 @@ def activate_chunk(doc, chunk_name):
     return chunk
 
 
-def align_images(chunk):
+def align_images(chunk, alignment_params):
     """
     Align images in the specified Metashape chunk.
 
     Parameters:
         chunk (Metashape.Chunk): The chunk containing the images to be aligned.
     """
-    
-    # Define alignment parameters
-    alignment_params = {
-        #Set Accuracy to high
-        "downscale": 2,
-        "generic_preselection": True,
-        "reference_preselection": True,
-        "reference_preselection_mode": Metashape.ReferencePreselectionSource,
-        "filter_mask": False,
-        "mask_tiepoints": True,
-        "filter_stationary_points": True,
-        "keypoint_limit": 60000,
-        "keypoint_limit_per_mpx": 1000,
-        "tiepoint_limit": 0,
-        "keep_keypoints": False,
-        "guided_matching": False,
-        "reset_matches": False,
-        "subdivide_task": True,
-        "workitem_size_cameras": 20,
-        "workitem_size_pairs": 80,
-        "max_workgroup_size": 100
-    }
-    for camera in chunk.cameras:
-        if camera.reference.location:
-            camera.reference.location_enabled = True
-        if camera.reference.rotation:
-            camera.reference.rotation_enabled = True
+
     # Perform image matching and alignment
     chunk.matchPhotos(**alignment_params)
     chunk.alignCameras()
@@ -348,9 +342,8 @@ def reconstruction_uncertainty(chunk, ru_filt_level_param, ru_cutoff, ru_increme
             nselected = len([True for point in points if point.valid is True and point.selected is True])
             # if increment is too large, 0 points will be selected. Adjust increment value downward by 25%. Only do this 10 times before stopping.
             if nselected == 0:
-                ru_increment = ru_increment * 0.25
                 ninc_reduced = ninc_reduced + 1
-                if ninc_reduced > 10:
+                if ninc_reduced > 15:
                     print('RU filter increment reduction called ten times, stopping execution.')
                     raise ValueError('RU filter increment reduction called ten times, stopping execution.')
                 else:
@@ -462,9 +455,8 @@ def projection_accuracy(chunk, pa_filt_level_param, pa_cutoff, pa_increment, cam
             nselected = len([True for point in points if point.valid is True and point.selected is True])
             # if increment is too large, 0 points will be selected. Adjust increment value downward by 25%. Only do this 10 times before stopping.
             if nselected == 0:
-                pa_increment = pa_increment * 0.25
                 ninc_reduced = ninc_reduced + 1
-                if ninc_reduced > 10:
+                if ninc_reduced > 15:
                     print('PA filter increment reduction called ten times, stopping execution.')
                     raise ValueError('PA filter increment reduction called ten times, stopping execution.')
                 else:
@@ -867,7 +859,7 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                         fit_p2=cam_opt_parameters['cal_p2'],
                         fit_p3=cam_opt_parameters['cal_p3'],
                         fit_p4=cam_opt_parameters['cal_p4'],
-                        tiepoint_covariance = True.
+                        tiepoint_covariance = True,
                         fit_corrections = True
                         )
     # Check if logging option enabled
@@ -1326,13 +1318,12 @@ def parse_command_line_args(parg, doc):
     print('1. Process will be performed on chunk ' + '"' + parg.initial_chunk + '"' + '.')
     # align message
     if parg.align:
-        print('2. Alignment ENABLED with the following options:\n'
-              + '    -accuracy = ' + parg.align_accuracy + '\n'
-              + '    -keytiepoint limit = ' + str(parg.keypointlimit) + '\n'
-              + '    -tiepoint limit = ' + str(parg.tiepointlimit) + '\n'
-              + '    -generic preselection = ' + str(parg.gen_preselect) + '\n'
-              + '    -reference preselection = ' + str(parg.ref_preselect) + '\n'
-              + '    -camera optimization parameters: ' + str(parg.al_cam_opt_param))
+        print('2. Alignment ENABLED with the following options:\n')
+        #print every line in parg.alignment_params
+        align_params = parg.alignment_params
+        for key in align_params:
+            print(f"    -{key}: {align_params[key]}")
+            print(f"    -camera optimization parameters: {parg.al_cam_opt_param}")
     else:
         print('2. Alignment DISABLED.')
 
@@ -1396,7 +1387,10 @@ def copy_chunks_for_cloud(post_error_chunk, doc):
     #Re-enable all cameras in the chunk (e.g. select or "check" cameras in reference pane) 
     #This is in case some cameras were disabled before alignment 
     for camera in chunk.cameras:
-        camera.reference.enabled = True
+        if camera.reference.location:
+            camera.reference.location_enabled = True
+        if camera.reference.rotation:
+            camera.reference.rotation_enabled = True
     copied_list = []
     #Create copies of the chunk for each camera group (different flight dates separated for building dense cloiud and rasters)
     print("Camera groups: " + str(chunk.camera_groups))
@@ -1813,15 +1807,14 @@ def main(parg, doc):
                     f.write("============= ALIGNMENT =============\n")
                     f.write("Copied chunk " + chunk.label + " to chunk " + align_chunk.label + "\n")
                     f.write("Geo Ref List: " + str(geo_ref_list) + "\n")
-                    f.write("Camera Optimization Parameters: " + str(al_cam_param) + "\n")
-                    f.write("Alignment Accuracy: " + parg.align_accuracy + "\n")
-                    f.write("Keypoint Limit: " + str(parg.keypointlimit) + "\n")
-                    f.write("Tiepoint Limit: " + str(parg.tiepointlimit) + "\n")
+                    align_params = parg.alignment_params
+                    for key in align_params:
+                        f.write(f"    -{key}: {align_params[key]}\n")
                     
                 # execute function
-                align_images(align_chunk)
+                align_images(align_chunk, parg.alignment_params)
             else:
-                align_images(align_chunk)
+                align_images(align_chunk, parg.alignment_params)
                 
                 
             print(f"Geo Ref List: {geo_ref_list}")
@@ -1922,9 +1915,9 @@ def main(parg, doc):
             chunk_label_list = [chunk.label for chunk in doc.chunks]
             #chunk = activate_chunk(doc, chunk_label_list[-1])
             chunk = activate_chunk(doc, "Raw_Photos_Align_RU10_PA3")
-            R1_opt = 10 # number of optimizations for round 1
+            R1_opt = 30 # number of optimizations for round 1
             R2_opt = 7 # number of optimizations for round 2
-            R2_TPA_ls = [0.07, 0.1]
+            R2_TPA_ls = [0.1]
             SEUW_dict = {}
             RMSE_dict = {}
             # check that chunk has a point cloud
