@@ -163,7 +163,8 @@ defaults.psx_list =[
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\Low_CoReg_All.psx"
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023_last_checked.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MM_all_102023.psx",
-    r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\MM_all_102023_align60k.psx",
+    r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_Intersection.psx",
+    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\MM_all_102023_align60k.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\MPM_all_102023.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\UM1_all_102023.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\UM2_all_102023.psx",
@@ -683,7 +684,7 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
     chunk.tiepoint_accuracy = RE_round2_tie_point_acc #step 10 in USGS document, lower from 0.1 for WIngtra flights on Peter's suggestion
     SEUWlast = 0
     SEUWopt = 1
-    while calc_camera_accuracy(chunk) < calc_camera_error(chunk) or math.fabs(SEUW-1) > 0.01:
+    while math.fabs(SEUW-1) > 0.01:
         metadata = chunk.meta
         SEUW = float(metadata['OptimizeCameras/sigma0'])
         RMSE = calc_RMS_error(chunk)
@@ -737,7 +738,7 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
         SEUW = float(metadata['OptimizeCameras/sigma0'])
         RMSE = calc_RMS_error(chunk)
         
-        if RMSE < 0.16:
+        if RMSE < 0.145:
             break
         
         if 'log' in kwargs:
@@ -883,7 +884,6 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                 f.write("Start time: " + str(starttime) + "\n")
                 f.write("End time: " + str(endtime) + "\n")
                 f.write("Processing duration: " + str(tdiff) + "\n")
-                f.write(f"Adaptive camera optimization enabled: {kwargs['adapt_cam_opt']}\n")
                 f.write("Adaptive camera optimization level: " + str(adapt_cam_level) + "\n")
                 f.write("\n")
     return SEUW, RMSE
