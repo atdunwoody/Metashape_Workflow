@@ -163,7 +163,8 @@ defaults.psx_list =[
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\Low_CoReg_All.psx"
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023_last_checked.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MM_all_102023.psx",
-    r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_Intersection.psx",
+    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_Intersection.psx",
+    r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\MM_all_102023_align60k.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\MM_all_102023_align60k.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\MPM_all_102023.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\UM1_all_102023.psx",
@@ -1609,7 +1610,8 @@ def calc_camera_error(chunk):
         error = error.norm()
         sums += error**2
         num += 1
-    return math.sqrt(sums / num)
+    if num > 0: return math.sqrt(sums / num) 
+    else: return 0
 
 def calc_camera_accuracy(chunk):
     # Returns the average vertical accuracy of the camera reference locations in the chunk
@@ -1622,6 +1624,8 @@ def calc_camera_accuracy(chunk):
         if not camera.reference.location:
             continue
         if not camera.reference.enabled:
+            continue
+        if not camera.reference.accuracy:
             continue
         camera_acc = camera.reference.accuracy[2] # Change index to 0 and 1 for lateral accuracy
         sums += camera_acc
