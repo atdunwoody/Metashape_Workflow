@@ -623,30 +623,7 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                     f.write(f"     -Camera Vertical Accuracy: {calc_camera_accuracy(chunk):.2f}\n")
                     f.write(f"     -Camera Vertical Error: {calc_camera_error(chunk):.2f}\n")
         # check if adaptive camera optimization parameters called
-        if 'adapt_cam_opt' in kwargs:
-            # if true
-            if kwargs['adapt_cam_opt']:
-                # check if other required kwargs present
-                if 'adapt_cam_level' not in kwargs or 'adapt_cam_param' not in kwargs:
-                # print exception so it will be visible in console, then raise exception
-                    print('ArgumentError: '"'adapt_cam_opt'"' keyword called, but '"'adapt_cam_level'"' and '"'adapt_cam_param'"' not present.')
-                    raise Exception(
-                            'ArgumentError: '"'adapt_cam_opt'"' keyword called, but '"'adapt_cam_level'"' and '"'adapt_cam_param'"' not present.')
-                # get 'adapt_cam_level', should be float 
-                adapt_cam_level = kwargs['adapt_cam_level']
-                if not str(adapt_cam_level).replace('.','',1).isdigit():
-                    # print exception so it will be visible in console, then raise exception
-                    print('ArgumentError: '"'adapt_cam_level'"' keyword is not a number.')
-                    raise Exception('ArgumentError: '"'adapt_cam_level'"' keyword is not a number.')
-    
-                # If threshold gets below adapt_cam_level, add additional camera params.
-                if threshold_re < adapt_cam_level:
-                    # then enable additional lens params
-                    cam_opt_parameters = kwargs['adapt_cam_param']
-                    cam_opt_parameters_str = str([k for (k, v) in cam_opt_parameters.items() if v])
-                    cam_opt_parameters_str = cam_opt_parameters_str.replace('cal_','')
-                    print('RE below ' +  str(adapt_cam_level) + ' pixel, enabling ' + cam_opt_parameters_str)
-
+       
         chunk.optimizeCameras(fit_f=cam_opt_parameters['cal_f'],
                               fit_cx=cam_opt_parameters['cal_cx'],
                               fit_cy=cam_opt_parameters['cal_cy'],
@@ -732,15 +709,16 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                 f.write(f"the RE value will be lowered to {threshold_re_R2:.2f} and {re_cutoff * 100:.2f}% of tie points will be removed each iteration.\n")
                 f.write(f"A max of {round2_max_optimizations} iterations will be performed in the second round.\n")
     noptimized_round2 = 1
-    while True:
+    ninc_reduced = 0
+    accuracy = calc_camera_accuracy(chunk)
+    lasterror = calc_camera_error(chunk)
+    while RMSE < 0.145 and error > accuracy:
         threshold_re = re_filt_level_param - 0.2 # set low threshold so 10% of points are removed  every iteration
         metadata = chunk.meta
         SEUW = float(metadata['OptimizeCameras/sigma0'])
         RMSE = calc_RMS_error(chunk)
-        
-        if RMSE < 0.145:
-            break
-        
+        error = calc_camera_error(chunk)
+
         if 'log' in kwargs:
             # check that filename defined
             if 'proclog' in kwargs:
@@ -766,21 +744,13 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
         if noptimized_round2 > round2_max_optimizations:
             break
         npoints = len(points)
+        
         while nselected * (1 / re_cutoff) > npoints:
             print("RE threshold ", threshold_re, "selected ", nselected, "/", npoints, "(",
                   round(nselected / npoints * 100, 4), " %) of  points. Adjusting")
             threshold_re = threshold_re + re_increment
             refilt.selectPoints(threshold_re)
             nselected = len([True for point in points if point.valid is True and point.selected is True])
-            # if increment is too large, 0 points will be selected. Adjust increment value downward by 25%. Only do this 10 times before stopping.
-            if nselected == 0:
-                re_increment = re_increment 
-                ninc_reduced = ninc_reduced + 1
-                if ninc_reduced > 15:
-                    print('RE filter increment reduction called ten times, stopping execution.')
-                    break
-                else:
-                    print("RE increment too large, reducing to " + str(re_increment) + ".")
 
         print("RE threshold ", threshold_re, " is ", round(nselected / npoints * 100, 4),
               "% of total points. Ready to delete")
@@ -884,7 +854,6 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                 f.write("Start time: " + str(starttime) + "\n")
                 f.write("End time: " + str(endtime) + "\n")
                 f.write("Processing duration: " + str(tdiff) + "\n")
-                f.write("Adaptive camera optimization level: " + str(adapt_cam_level) + "\n")
                 f.write("\n")
     return SEUW, RMSE
 
@@ -1633,7 +1602,8 @@ def calc_camera_error(chunk):
             continue
         if not camera.reference.location:
             continue
-
+        if not camera.reference.enabled:
+            continue
         estimated_geoc = chunk.transform.matrix.mulp(camera.center)
         error = chunk.crs.unproject(camera.reference.location) - estimated_geoc
         error = error.norm()
@@ -1650,6 +1620,8 @@ def calc_camera_accuracy(chunk):
         if not camera.transform:
             continue
         if not camera.reference.location:
+            continue
+        if not camera.reference.enabled:
             continue
         camera_acc = camera.reference.accuracy[2] # Change index to 0 and 1 for lateral accuracy
         sums += camera_acc
@@ -1986,11 +1958,10 @@ def main(parg, doc):
             maxconf = parg.maxconf
             print("Building Point Clouds")
             chunk_label_list = [chunk.label for chunk in doc.chunks]
-            #regex = re.compile(r'_RE\d+\.\d+$') # search for chunks that end with _RE<digits>.<digits>
-            #post_error_chunk_list = [chunk for chunk in chunk_label_list if regex.search(chunk)]
             post_error_chunk_list = [chunk for chunk in chunk_label_list if chunk.endswith("_RE0.3")]
             print("Chunks to process: " + str(post_error_chunk_list))
-
+            if len(post_error_chunk_list) == 0:
+                post_error_chunk_list = [chunk.label]
             #Get the chunk names and create a counter for progress updates
             for current_chunk, i in zip(post_error_chunk_list, range(len(post_error_chunk_list))):
                 print("Processing " + current_chunk)
@@ -2013,16 +1984,17 @@ def main(parg, doc):
                     print(e)
                     doc.save()
                     continue
-            if parg.log:
-                # if logging enabled use kwargs
-                print('Logging to file ' + parg.proclogname)
-                # write input and output chunk to log file
-                with open(parg.proclogname, 'a') as f:
-                    f.write("\n==================POINT CLOUD=============================== \n")
-                    f.write("Built Dense Cloud and Filtered Point Cloud for chunk " + current_chunk + ".\n")
-                    f.write("Point Cloud Quality: High \n")
-                    f.write("Point Cloud Filter: Mild \n")
-                    f.write("Fltered by Confidence Level: " + str(maxconf) + "\n")
+                
+                if parg.log:
+                    # if logging enabled use kwargs
+                    print('Logging to file ' + parg.proclogname)
+                    # write input and output chunk to log file
+                    with open(parg.proclogname, 'a') as f:
+                        f.write("\n==================POINT CLOUD=============================== \n")
+                        f.write("Built Dense Cloud and Filtered Point Cloud for chunk " + current_chunk + ".\n")
+                        f.write("Point Cloud Quality: High \n")
+                        f.write("Point Cloud Filter: Mild \n")
+                        f.write("Fltered by Confidence Level: " + str(maxconf) + "\n")
         if parg.build:    
             print("----------------------------------------------------------------------------------------")
             chunk = doc.chunk
