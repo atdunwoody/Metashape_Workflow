@@ -137,7 +137,7 @@ defaults.psx_list =[
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023_last_checked.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MM_all_102023.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_Intersection.psx",
-    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MM_10_2023\MM_all_102023_align60k_intersection.psx",
+    ##r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\LPM_10_2023\LPM_Intersection_v2.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\MM_all_102023_align60k.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\MPM_all_102023.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\UM1_all_102023.psx",
@@ -202,7 +202,6 @@ defaults.ru_filt_level = 10         # ru gradual selection filter level (default
 # ------------Projection Accuracy (pa) defaults ---------------------------------------
 defaults.pa = False                 # run pa gradual selection iterations
 defaults.pa_filt_level = 2          # pa gradual selection filter level (default=3, optimum value: [2-4])
-
 
 # ------------Reprojection Error (re) defaults -----------------------------------------
 defaults.re = False                 # run re gradual selection iterations
@@ -1421,9 +1420,6 @@ def main(parg, doc):
           doc = active Metashape.app.document object
           parg = Arg object with formatted argument attributes
     """
-    if len(parg.psx_list) == 0:
-        parg.psx_list = [doc.path]
-        
     for psx_file in parg.psx_list:
         # Open the project file
         processing_start = datetime.now()
@@ -1488,6 +1484,7 @@ def main(parg, doc):
         doc.save(psx)
         # ALIGN IMAGES
         if parg.align:
+            align_start = datetime.now()
             #Aactivate last chunk in the list
             chunk_label_list = [chunk.label for chunk in doc.chunks]
             #chunk = activate_chunk(doc, chunk_label_list[-1])
@@ -1497,13 +1494,11 @@ def main(parg, doc):
             align_chunk.label = chunk.label + '_Align'
             print('Copied chunk ' + chunk.label + ' to chunk ' + align_chunk.label)
 
-            # Run alignment using align_images function
-            print('Aligning images')
             geo_ref_list = geo_ref_dict[psx] 
-            if parg.log:
-                # if logging enabled use kwargs
-                print('Logging to file ' + parg.proclogname)
-                # write input and output chunk to log file
+
+            align_images(align_chunk, parg.alignment_params)
+
+            if parg.log:    
                 with open(parg.proclogname, 'a') as f:
                     f.write("\n")
                     f.write("============= ALIGNMENT =============\n")
@@ -1512,12 +1507,7 @@ def main(parg, doc):
                     align_params = parg.alignment_params
                     for key in align_params:
                         f.write(f"    -{key}: {align_params[key]}\n")
-                    
-                align_images(align_chunk, parg.alignment_params)
-            else:
-                align_images(align_chunk, parg.alignment_params)
-                
-                
+                    f.write(f"Alignment processing time: {datetime.now() - align_start}\n")
             print(f"Geo Ref List: {geo_ref_list}")
             #for geo_ref in geo_ref_list:    
                 #chunk.importReference(os.path.join(geo_ref), delimiter = ',', columns = 'nxyzabcXZ')
@@ -1644,6 +1634,7 @@ def main(parg, doc):
 
         if parg.pcbuild:
             print("----------------------------------------------------------------------------------------")
+            pcbuild_start = datetime.now()
             chunk = doc.chunk
             maxconf = parg.maxconf
             print("Building Point Clouds")
@@ -1659,15 +1650,23 @@ def main(parg, doc):
 
             #------------Build Dense Cloud and Filter Point Cloud-----------------#
                 try:
-                    print("-------------------------------COPY CHUNKS FOR CLOUD---------------------------------------")
+                    print("-------------------------------COPY CHUNKS FOR CLOUD---------------------------------------\n")
                     copied_list = copy_chunks_for_cloud(current_chunk, doc)
                     for copied_chunk in copied_list:
                         chunk = activate_chunk(doc, copied_chunk)
-                        if len(chunk.depth_maps_sets) == 0:
-                            print("-------------------------------BUILD DENSE CLOUD---------------------------------------")
-                            print("")
-                            print(f"Filtering point cloud for {copied_chunk}")
+                        if len(chunk.depth_maps_sets) == 0: #Check that a point cloud doesnt already exist
+                            print("-------------------------------BUILD DENSE CLOUD---------------------------------------\n")
+
+                            cloud_start = datetime.now()
                             buildDenseCloud(copied_chunk, doc)
+                            if parg.log:
+                                with open(parg.proclogname, 'a') as f:
+                                    f.write("\n==================POINT CLOUD=============================== \n")
+                                    f.write("Built Dense Cloud and Filtered Point Cloud for chunk " + copied_chunk + ".\n")
+                                    f.write("Point Cloud Quality: High \n")
+                                    f.write("Point Cloud Filter: Mild \n")
+                                    f.write("Fltered by Confidence Level: " + str(maxconf) + "\n")
+                                    f.write("Processing time: " + str(datetime.now() - cloud_start) + "\n")
                         print("-------------------------------FILTER DENSE CLOUD---------------------------------------")
                         filtered_chunk = filter_point_cloud(copied_chunk, maxconf, doc)
                 except Exception as e:
@@ -1675,17 +1674,10 @@ def main(parg, doc):
                     print(e)
                     doc.save()
                     continue
-                
-                if parg.log:
-                    # if logging enabled use kwargs
-                    print('Logging to file ' + parg.proclogname)
-                    # write input and output chunk to log file
-                    with open(parg.proclogname, 'a') as f:
-                        f.write("\n==================POINT CLOUD=============================== \n")
-                        f.write("Built Dense Cloud and Filtered Point Cloud for chunk " + current_chunk + ".\n")
-                        f.write("Point Cloud Quality: High \n")
-                        f.write("Point Cloud Filter: Mild \n")
-                        f.write("Fltered by Confidence Level: " + str(maxconf) + "\n")
+            if parg.log:
+                with open(parg.proclogname, 'a') as f:
+                    f.write(f"\n{len(copied_list)} Point Clouds built and filtered in {datetime.now() - pcbuild_start}\n")
+
         if parg.build:    
             print("----------------------------------------------------------------------------------------")
             chunk = doc.chunk
