@@ -31,51 +31,24 @@ Align_RuPaRe.py [-h]
                     Initial chunk to process. Optional. [Default=active chunk]
                 [-align] 
                     Perform image alignment. 
-                        Optional alignment sub-arguments:                  
-                            [-al_acc [highest, high, medium, low, lowest]]
-                                Alignment accuracy. [Default=high]
-                            [-al_kplim [float]] 
-                                Alignment keypoint limit. [Default=100,000]
-                            [-al_tplim [float]]
-                                Alignment tiepoint limit. [Default=0]
-                            [-al_generic [bool]]
-                                Alignment generic preselection. [Default=True]
-                            [-al_reference [bool]]
-                                Alignment reference preselection. [Default=False]
-                            [-al_cam_param [space delim list of str (ex: f cx cy k1 k2)] 
-                                Camera optimization lens params. 
-                                        [Default= f, cx, cy, k1, k2, k3, p1, p2]
                 [-ru]
                     Perform reconstruction uncertainty (RU) gradual selection iterations. 
                         Optional RU sub-arguments:
                             [-ru_level [float]]
                                 RU gradual selection filter level [Default=10]
-                            [-ru_cam_param [space delim list of str (ex: f cx cy k1 k2)] 
-                                Camera optimization lens params. 
-                                        [Default= f, cx, cy, k1, k2, k3, p1, p2]
+
                 [-pa]
                     Perform projection accuracy (PA) gradual selection iterations. 
                         Optional PA sub-arguments:
                             [-pa_level [float]]
                                 PA gradual selection filter level [Default=3]
-                            [-pa_cam_param [space delim list of str (ex: f cx cy k1 k2)] 
-                                Camera optimization lens params. 
-                                        [Default= f, cx, cy, k1, k2, k3, p1, p2]
+
                 [-re]
                     Perform reprojection error (RE) gradual selection iterations. 
                         Optional RE sub-arguments:
                             [-re_level [float]]
                                 RE gradual selection filter level [Default=0.3]
-                            [-re_cam_param [space delim list of str (ex: f cx cy k1 k2)]
-                                Camera optimization lens params. 
-                                        [Default= f, cx, cy, k1, k2, k3, p1, p2]
-                            [-re_adapt_cam [bool]
-                                Adjust camera opt. lens params based on RE level [Default=True]
-                            [-re_adapt_level [float]]
-                                RE level at which to add additional lens params. [Default=1]
-                            [-re_adapt_cam_param [space delim list of str (ex: f cx cy k1 k2)]
-                                Additional lens params to add
-                                        [Default= k4, b1, b2, p3, p4]
+
                 [-log [str name optional, otherwise Metashape proj. name used]]
                     Create optional processing log file. [Default=no log file]
                         (if -log provided with no arg, log will be named using Metashape proj. name)
@@ -164,7 +137,7 @@ defaults.psx_list =[
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023_last_checked.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MM_all_102023.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_Intersection.psx",
-    r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MM_10_2023\MM_all_102023_align60k_intersection.psx",
+    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MM_10_2023\MM_all_102023_align60k_intersection.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\MM_all_102023_align60k.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\MPM_all_102023.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\UM1_all_102023.psx",
@@ -241,10 +214,8 @@ defaults.re_RMSE_goal = 0.145
 
 # adjust camera optimization parameters when RE level is below threshold
 defaults.re_adapt = False            # enable adaptive camera opt params (default=True)
-defaults.re_adapt_level = 1         # RE level at which to adjust camera opt params (default=1)
-# re adjust camera optimization parameters. These are enabled and added to initial re_cam_opt_param
-defaults.re_adapt_add_cam_param = []
-#defaults.re_adapt_add_cam_param = ['k4','b1','b2','p3','p4']
+
+
 # ------------Process logging defaults ------------------------------------------------
 defaults.log = True
 # logfile name. Set to 'default.txt' to have output file named X_ProcessingLog.txt, where X=name of Metashape project
@@ -336,7 +307,7 @@ def reconstruction_uncertainty(chunk, ru_filt_level_param, ru_cutoff, ru_increme
     points = chunk.tie_points.points
     init_pointcount = len([True for point in points if point.valid is True])
 
-    while True:
+    while len(chunk.tie_points.points) > init_pointcount * 0.5:
         # define threshold variables
         points = chunk.tie_points.points
         f = Metashape.TiePoints.Filter()
@@ -348,7 +319,7 @@ def reconstruction_uncertainty(chunk, ru_filt_level_param, ru_cutoff, ru_increme
         # calculate number of selected points
         nselected = len([True for point in points if point.valid is True and point.selected is True])
         print(nselected, " points selected")
-        if nselected == 0:
+        if nselected < 100:
             break
         npoints = len(points)
         while nselected * (1 / ru_cutoff) > npoints:
@@ -416,6 +387,7 @@ def reconstruction_uncertainty(chunk, ru_filt_level_param, ru_cutoff, ru_increme
                 f.write(str(ndeleted) + " of " + str(init_pointcount) + " removed in " + str(
                     noptimized) + " optimizations.\n")
                 f.write("Final point count: " + str(end_pointcount) + "\n")
+                f.write(f"Iterations: {noptimized}\n")
                 f.write("Final Reconstruction Uncertainty: " + str(threshold_ru) + ".\n")
                 f.write('Final camera lens calibration parameters: ' + ', '.join(
                     [k for k in cam_opt_parameters if cam_opt_parameters[k]]) + '\n')
@@ -452,7 +424,7 @@ def projection_accuracy(chunk, pa_filt_level_param, pa_cutoff, pa_increment, cam
     points = chunk.tie_points.points
     init_pointcount = len([True for point in points if point.valid is True])
 
-    while True:
+    while len(chunk.tie_points.points) > init_pointcount * 0.5:
         # define threshold variables
         points = chunk.tie_points.points
         f = Metashape.TiePoints.Filter()
@@ -464,7 +436,7 @@ def projection_accuracy(chunk, pa_filt_level_param, pa_cutoff, pa_increment, cam
         # calculate number of selected points
         nselected = len([True for point in points if point.valid is True and point.selected is True])
         print(nselected, " points selected")
-        if nselected == 0:
+        if nselected < 100:
             break
         npoints = len(points)
 
@@ -534,6 +506,7 @@ def projection_accuracy(chunk, pa_filt_level_param, pa_cutoff, pa_increment, cam
                 f.write(str(ndeleted) + " of " + str(init_pointcount) + " removed in " + str(
                     noptimized) + " optimizations.\n")
                 f.write("Final point count: " + str(end_pointcount) + "\n")
+                f.write(f"Iterations: {noptimized}\n")
                 f.write("Final Projection Accuracy: " + str(threshold_pa) + ".\n")
                 f.write('Final camera lens calibration parameters: ' + ', '.join(
                     [k for k in cam_opt_parameters if cam_opt_parameters[k]]) + '\n')
@@ -585,7 +558,7 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                 f.write(f"Max {round1_max_optimizations} iterations will be performed in the first round to prevent overfitting.\n")
                 f.write(f"Tie Point Accuracy: {chunk.tiepoint_accuracy:.2f}\n")
 
-    while True:
+    while len(chunk.tie_points.points) > init_pointcount * 0.4:
 
         metadata = chunk.meta
         SEUW = float(metadata['OptimizeCameras/sigma0'])
@@ -721,7 +694,7 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
     ninc_reduced = 0
     accuracy = calc_camera_accuracy(chunk)
 
-    while RMSE < RMSE_goal and error > accuracy:
+    while (RMSE < RMSE_goal or error > accuracy) and (len(chunk.tie_points.points) > init_pointcount * 0.4):
         threshold_re = re_filt_level_param - 0.2 # set low threshold so 10% of points are removed  every iteration
         metadata = chunk.meta
         SEUW = float(metadata['OptimizeCameras/sigma0'])
@@ -1448,6 +1421,9 @@ def main(parg, doc):
           doc = active Metashape.app.document object
           parg = Arg object with formatted argument attributes
     """
+    if len(parg.psx_list) == 0:
+        parg.psx_list = [doc.path]
+        
     for psx_file in parg.psx_list:
         # Open the project file
         processing_start = datetime.now()
@@ -1658,7 +1634,7 @@ def main(parg, doc):
                     f.write("\n")
                     f.write("============= REPROJECTION ERROR =============\n")
                     f.write("Copied chunk " + chunk.label + " to chunk " + re_chunk.label + "\n")
-                # execute function, give additional kwargs if re_adapt_cam_opt enabled
+
                 reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, parg.cam_opt_param, RMSE_goal, R1_opt, R2_opt, R2_TPA, log=True,
                                 proclog=parg.proclogname)
             else:
