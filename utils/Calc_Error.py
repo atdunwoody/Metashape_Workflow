@@ -70,13 +70,15 @@ def calc_camera_accuracy(chunk):
             continue
         if not camera.reference.location:
             continue
+
+        if not camera.reference.accuracy:
+            continue
         camera_acc = camera.reference.accuracy[2] # Change index to 0 and 1 for lateral accuracy
         sums += camera_acc
         num += 1
-     
-    if num == 0:
-          return 0
-    return sums / num
+    if num > 0: return sums / num
+    else: return 0
+
 
 doc = Metashape.app.document
 doc.save()
@@ -93,6 +95,9 @@ for chunk in doc.chunks[:]:
      chunkdict[label] = [SEUW, accuracy, cam_error]
      print(f"Chunk info for {label}:   SEUW: {SEUW}, Accuracy: {accuracy}, Camera Error: {cam_error}")
 
+
+
+"""
 # Write the results to a CSV file
 output_file = doc.path[0:(len(doc.path)-4)] + '_chunk_info.csv'
 with open(output_file, "w") as fid:
@@ -102,5 +107,4 @@ with open(output_file, "w") as fid:
           if key != 'label':
                fwriter.writerow([key] + chunkdict[key])
                
-
-
+"""

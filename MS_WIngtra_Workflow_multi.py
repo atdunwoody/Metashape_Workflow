@@ -164,7 +164,7 @@ defaults.psx_list =[
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023_last_checked.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MM_all_102023.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_Intersection.psx",
-    r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\MM_all_102023_align60k.psx",
+    r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MM_10_2023\MM_all_102023_align60k_intersection.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\MM_all_102023_align60k.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\MPM_all_102023.psx",
     #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\UM1_all_102023.psx",
@@ -179,11 +179,7 @@ defaults.setup = False              # run MS_PSX_Setup.py
 defaults.pcbuild = False            # run MS_Build_PointCloud.py
 defaults.build = False             # run MS_Build_Products.py
 defaults.align = False              # run image alignment
-defaults.align_accuracy = 'High'    # image alignment accuracy (must be: 'highest', 'high', 'medium', 'low', 'lowest'
-defaults.keypointlimit = 60000     # alignment keypointlimit (0 = unlimited)
-defaults.tiepointlimit = 0        # alignment tiepointlimit (0 = unlimited)
-defaults.gen_preselect = True       # alignment generic preselection
-defaults.ref_preselect = False      # alignment reference preselection
+
 defaults.alignment_params = {
         "downscale": 1, # 0 = Highest, 1 = High, 2 = Medium, 3 = Low, 4 = Lowest
         "generic_preselection": True, # Default is True, speeds up alignment
@@ -204,26 +200,45 @@ defaults.alignment_params = {
         "workitem_size_pairs": 80,
         "max_workgroup_size": 100
     }
-# alignment camera optimization parameters
-defaults.al_cam_opt_param = ['f','cx','cy','k1','k2','k3','p1','p2']
+
+defaults.cam_opt_parameters = {
+        "cal_f": True,
+        "cal_cx": True,
+        "cal_cy": True,
+        "cal_b1": False,
+        "cal_b2": False,
+        "cal_k1": True,
+        "cal_k2": True,
+        "cal_k3": True,
+        "cal_k4": False,
+        "cal_p1": True,
+        "cal_p2": True,
+        "cal_p3": False,
+        "cal_p4": False,
+        "adaptive_fitting": False,
+        "tiepoint_covariance": True,
+        "fit_corrections": True
+    }
+
 
 # ------------Reconstruction Uncertainty (ru) defaults ---------------------------------
 defaults.ru = False                 # run ru gradual selection iterations
 defaults.ru_filt_level = 10         # ru gradual selection filter level (default=10, optimum value: [10 - 15])
-# ru camera optimization parameters
-defaults.ru_cam_opt_param = ['f','cx','cy','k1','k2','k3','p1','p2']
+
 
 # ------------Projection Accuracy (pa) defaults ---------------------------------------
 defaults.pa = False                 # run pa gradual selection iterations
-defaults.pa_filt_level = 3          # pa gradual selection filter level (default=3, optimum value: [2-4])
-# pa camera optimization parameters
-defaults.pa_cam_opt_param = ['f','cx','cy','k1','k2','k3','p1','p2']
+defaults.pa_filt_level = 2          # pa gradual selection filter level (default=3, optimum value: [2-4])
+
 
 # ------------Reprojection Error (re) defaults -----------------------------------------
 defaults.re = False                 # run re gradual selection iterations
 defaults.re_filt_level = 0.3        # re gradual selection filter level (default=0.3, optimum value: [0.3])
-# re camera optimization parameters
-defaults.re_cam_opt_param = ['f','cx','cy','k1','k2','k3','p1','p2']
+defaults.re_round1_opt = 30          # max number of camera optimization iterations in round 1 (default=5)
+defaults.re_round2_opt = 10          # max number of camera optimization iterations in round 2 (default=5)
+defaults.re_round2_TPA = 0.1
+defaults.re_RMSE_goal = 0.145
+
 # adjust camera optimization parameters when RE level is below threshold
 defaults.re_adapt = False            # enable adaptive camera opt params (default=True)
 defaults.re_adapt_level = 1         # RE level at which to adjust camera opt params (default=1)
@@ -344,6 +359,7 @@ def reconstruction_uncertainty(chunk, ru_filt_level_param, ru_cutoff, ru_increme
             nselected = len([True for point in points if point.valid is True and point.selected is True])
             # if increment is too large, 0 points will be selected. Adjust increment value downward by 25%. Only do this 10 times before stopping.
             if nselected == 0:
+                ru_increment = ru_increment * 0.25
                 ninc_reduced = ninc_reduced + 1
                 if ninc_reduced > 15:
                     print('RU filter increment reduction called ten times, stopping execution.')
@@ -369,7 +385,10 @@ def reconstruction_uncertainty(chunk, ru_filt_level_param, ru_cutoff, ru_increme
                               fit_p2=cam_opt_parameters['cal_p2'],
                               fit_p3=cam_opt_parameters['cal_p3'],
                               fit_p4=cam_opt_parameters['cal_p4'],
-                              tiepoint_covariance = True)
+                              adaptive_fitting = cam_opt_parameters['adaptive_fitting'],
+                              tiepoint_covariance = cam_opt_parameters['tiepoint_covariance'],
+                              fit_corrections = False
+                              )
         noptimized = noptimized + 1
         print("completed optimization #", noptimized)
 
@@ -457,6 +476,7 @@ def projection_accuracy(chunk, pa_filt_level_param, pa_cutoff, pa_increment, cam
             nselected = len([True for point in points if point.valid is True and point.selected is True])
             # if increment is too large, 0 points will be selected. Adjust increment value downward by 25%. Only do this 10 times before stopping.
             if nselected == 0:
+                pa_increment = pa_increment * 0.25
                 ninc_reduced = ninc_reduced + 1
                 if ninc_reduced > 15:
                     print('PA filter increment reduction called ten times, stopping execution.')
@@ -482,7 +502,10 @@ def projection_accuracy(chunk, pa_filt_level_param, pa_cutoff, pa_increment, cam
                               fit_p2=cam_opt_parameters['cal_p2'],
                               fit_p3=cam_opt_parameters['cal_p3'],
                               fit_p4=cam_opt_parameters['cal_p4'],
-                              tiepoint_covariance = True)
+                              adaptive_fitting = cam_opt_parameters['adaptive_fitting'],
+                              tiepoint_covariance = cam_opt_parameters['tiepoint_covariance'],
+                              fit_corrections = False
+                              )
         noptimized = noptimized + 1
         print("completed optimization #", noptimized)
     else:
@@ -520,7 +543,7 @@ def projection_accuracy(chunk, pa_filt_level_param, pa_cutoff, pa_increment, cam
                 f.write("\n")
 
 
-def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_opt_parameters, 
+def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_opt_parameters, RMSE_goal,
                        round1_max_optimizations, round2_max_optimizations, RE_round2_tie_point_acc, **kwargs):
     """"
     Perform gradual selection on sparse cloud using Reprojection Error ("RE") filter.
@@ -544,7 +567,6 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
     noptimized = 1
     ndeleted = 0
     ninc_reduced = 0
-    maxSEUWopt = 2
     
     # get start time for processing log
     starttime = datetime.now()
@@ -562,12 +584,9 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                 f.write(f"Each iteration, RE value will be lowered until {re_cutoff*100}% of points are removed or RE threshold is reached.\n")
                 f.write(f"Max {round1_max_optimizations} iterations will be performed in the first round to prevent overfitting.\n")
                 f.write(f"Tie Point Accuracy: {chunk.tiepoint_accuracy:.2f}\n")
-    SEUWlast = 0
+
     while True:
-        if noptimized > 1:
-            SEUWlast = SEUW
-        else:
-            SEUWlast = 0
+
         metadata = chunk.meta
         SEUW = float(metadata['OptimizeCameras/sigma0'])
 
@@ -637,12 +656,16 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                               fit_p1=cam_opt_parameters['cal_p1'],
                               fit_p2=cam_opt_parameters['cal_p2'],
                               fit_p3=cam_opt_parameters['cal_p3'],
-                              fit_p4=cam_opt_parameters['cal_p4']#,tiepoint_covariance = True
+                              fit_p4=cam_opt_parameters['cal_p4'],
+                              adaptive_fitting = cam_opt_parameters['adaptive_fitting'],
+                              tiepoint_covariance = cam_opt_parameters['tiepoint_covariance'],
+                              fit_corrections = False
                               )
         noptimized = noptimized + 1
-        SEUWlast = SEUW
+
         print("Completed optimization #", noptimized)
-    threshold_re_R2 = re_filt_level_param - 0.25
+        
+    
     if 'log' in kwargs:
             # check that filename defined
             if 'proclog' in kwargs:
@@ -654,57 +677,42 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
     
     #======================================USGS Step 9==============================================================
     RMSE = calc_RMS_error(chunk)
-    if RMSE < 0.18:
+    if RMSE < RMSE_goal:
         return SEUW, RMSE
     
     #======================================USGS Step 10 - 12==============================================================
 
     chunk.tiepoint_accuracy = RE_round2_tie_point_acc #step 10 in USGS document, lower from 0.1 for WIngtra flights on Peter's suggestion
-    SEUWlast = 0
-    SEUWopt = 1
-    while math.fabs(SEUW-1) > 0.01:
-        metadata = chunk.meta
-        SEUW = float(metadata['OptimizeCameras/sigma0'])
-        RMSE = calc_RMS_error(chunk)
-        # SEUW should be getting closer to 1 every iteration, if it's not, lower tie point accuracy to a floor of 0.05
-        #if math.fabs(1 - SEUW) > math.fabs(1 - SEUWlast) and noptimized_round2 > 2: #Wait until the second iteration to start lowering the tie point accuracy, SEUW chnages a lot from round1
-            #break
-        chunk.optimizeCameras(fit_f=cam_opt_parameters['cal_f'],
-                              fit_cx=cam_opt_parameters['cal_cx'],
-                              fit_cy=cam_opt_parameters['cal_cy'],
-                              fit_k1=cam_opt_parameters['cal_k1'],
-                              fit_k2=cam_opt_parameters['cal_k2'],
-                              fit_k3=cam_opt_parameters['cal_k3'],
-                              fit_k4=cam_opt_parameters['cal_k4'],
-                              fit_p1=cam_opt_parameters['cal_p1'],
-                              fit_p2=cam_opt_parameters['cal_p2'],
-                              fit_p3=cam_opt_parameters['cal_p3'],
-                              fit_p4=cam_opt_parameters['cal_p4']#,tiepoint_covariance = True
-                              )
 
-        
-        if 'log' in kwargs:
-            if 'proclog' in kwargs:
-                # write results to processing log
-                with open(kwargs['proclog'], 'a') as f:
-                    f.write(f"Camera Optimization Iteration #{SEUWopt}\n")
-                    f.write(f"     -SEUW/Sigma0 value: {SEUW:.4f}\n")
-                    f.write(f"     -Tie point accuracy: {chunk.tiepoint_accuracy:.2f}\n")
-                    f.write(f"     -Camera Error: {calc_camera_error(chunk)}\n")
-                    f.write(f"     -Camera Accuracy: {calc_camera_accuracy(chunk)}\n")
-                    f.write(f"     -RMSE: {RMSE:.4f}\n")
-        
-        if SEUWopt > maxSEUWopt:
-            break
-        SEUWopt += 1
-        
+    metadata = chunk.meta
+    SEUW = float(metadata['OptimizeCameras/sigma0'])
+    RMSE = calc_RMS_error(chunk)
+
+    chunk.optimizeCameras(fit_f=cam_opt_parameters['cal_f'],
+                            fit_cx=cam_opt_parameters['cal_cx'],
+                            fit_cy=cam_opt_parameters['cal_cy'],
+                            fit_b1=cam_opt_parameters['cal_b1'],
+                            fit_b2=cam_opt_parameters['cal_b2'],
+                            fit_k1=cam_opt_parameters['cal_k1'],
+                            fit_k2=cam_opt_parameters['cal_k2'],
+                            fit_k3=cam_opt_parameters['cal_k3'],
+                            fit_k4=cam_opt_parameters['cal_k4'],
+                            fit_p1=cam_opt_parameters['cal_p1'],
+                            fit_p2=cam_opt_parameters['cal_p2'],
+                            fit_p3=cam_opt_parameters['cal_p3'],
+                            fit_p4=cam_opt_parameters['cal_p4'],
+                            adaptive_fitting = cam_opt_parameters['adaptive_fitting'],
+                            tiepoint_covariance = cam_opt_parameters['tiepoint_covariance'],
+                            fit_corrections = False
+                            )
+
     #======================================USGS Step 14 - 18==============================================================
+    threshold_re_R2 = 0.05
     if 'log' in kwargs:
         # check that filename defined
         if 'proclog' in kwargs:
             # write results to processing log
             with open(kwargs['proclog'], 'a') as f:
-                f.write(F"SEUW optimization completed with {SEUWopt} optimizations.\n")
                 f.write(f"\nSecond round of optimizations will begin with a tie point accuracy of {RE_round2_tie_point_acc}, which will be lowered dynamically if SEUW deviates from 1.\n")
                 f.write("Optimal SEUW value is 1, and it should be approaching closer to 1 after every iteration.\n")
                 f.write(f"the RE value will be lowered to {threshold_re_R2:.2f} and {re_cutoff * 100:.2f}% of tie points will be removed each iteration.\n")
@@ -712,8 +720,8 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
     noptimized_round2 = 1
     ninc_reduced = 0
     accuracy = calc_camera_accuracy(chunk)
-    lasterror = calc_camera_error(chunk)
-    while RMSE < 0.145 and error > accuracy:
+
+    while RMSE < RMSE_goal and error > accuracy:
         threshold_re = re_filt_level_param - 0.2 # set low threshold so 10% of points are removed  every iteration
         metadata = chunk.meta
         SEUW = float(metadata['OptimizeCameras/sigma0'])
@@ -764,31 +772,7 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                 # write results to processing log
                 with open(kwargs['proclog'], 'a') as f:
                     f.write(f"RE {threshold_re:.2f} deleted {nselected} points {round(nselected / npoints * 100, 4)}% of total points\n")
-
-        # check if adaptive camera optimization parameters called
-        if 'adapt_cam_opt' in kwargs:
-            # if true
-            if kwargs['adapt_cam_opt']:
-                # check if other required kwargs present
-                if 'adapt_cam_level' not in kwargs or 'adapt_cam_param' not in kwargs:
-                # print exception so it will be visible in console, then raise exception
-                    print('ArgumentError: '"'adapt_cam_opt'"' keyword called, but '"'adapt_cam_level'"' and '"'adapt_cam_param'"' not present.')
-                    raise Exception(
-                            'ArgumentError: '"'adapt_cam_opt'"' keyword called, but '"'adapt_cam_level'"' and '"'adapt_cam_param'"' not present.')
-                # get 'adapt_cam_level', should be float 
-                adapt_cam_level = kwargs['adapt_cam_level']
-                if not str(adapt_cam_level).replace('.','',1).isdigit():
-                    # print exception so it will be visible in console, then raise exception
-                    print('ArgumentError: '"'adapt_cam_level'"' keyword is not a number.')
-                    raise Exception('ArgumentError: '"'adapt_cam_level'"' keyword is not a number.')
     
-                # If threshold gets below adapt_cam_level, add additional camera params.
-                if threshold_re < adapt_cam_level:
-                    # then enable additional lens params
-                    cam_opt_parameters = kwargs['adapt_cam_param']
-                    cam_opt_parameters_str = str([k for (k, v) in cam_opt_parameters.items() if v])
-                    cam_opt_parameters_str = cam_opt_parameters_str.replace('cal_','')
-                    print('RE below ' +  str(adapt_cam_level) + ' pixel, enabling ' + cam_opt_parameters_str)
 
         chunk.optimizeCameras(fit_f=cam_opt_parameters['cal_f'],
                               fit_cx=cam_opt_parameters['cal_cx'],
@@ -802,7 +786,10 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                               fit_p1=cam_opt_parameters['cal_p1'],
                               fit_p2=cam_opt_parameters['cal_p2'],
                               fit_p3=cam_opt_parameters['cal_p3'],
-                              fit_p4=cam_opt_parameters['cal_p4'] #,tiepoint_covariance = True
+                              fit_p4=cam_opt_parameters['cal_p4'],
+                              adaptive_fitting = cam_opt_parameters['adaptive_fitting'],
+                              tiepoint_covariance = cam_opt_parameters['tiepoint_covariance'],
+                              fit_corrections = cam_opt_parameters['fit_corrections']
                               )
         noptimized_round2 = noptimized_round2 + 1
         SEUWlast = SEUW
@@ -821,19 +808,22 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
     refilt.selectPoints(threshold_re)
     refilt.resetSelection()
     chunk.optimizeCameras(fit_f=cam_opt_parameters['cal_f'],
-                        fit_cx=cam_opt_parameters['cal_cx'],
-                        fit_cy=cam_opt_parameters['cal_cy'],
-                        fit_k1=cam_opt_parameters['cal_k1'],
-                        fit_k2=cam_opt_parameters['cal_k2'],
-                        fit_k3=cam_opt_parameters['cal_k3'],
-                        fit_k4=cam_opt_parameters['cal_k4'],
-                        fit_p1=cam_opt_parameters['cal_p1'],
-                        fit_p2=cam_opt_parameters['cal_p2'],
-                        fit_p3=cam_opt_parameters['cal_p3'],
-                        fit_p4=cam_opt_parameters['cal_p4'],
-                        tiepoint_covariance = True,
-                        fit_corrections = True
-                        )
+                            fit_cx=cam_opt_parameters['cal_cx'],
+                            fit_cy=cam_opt_parameters['cal_cy'],
+                            fit_b1=cam_opt_parameters['cal_b1'],
+                            fit_b2=cam_opt_parameters['cal_b2'],
+                            fit_k1=cam_opt_parameters['cal_k1'],
+                            fit_k2=cam_opt_parameters['cal_k2'],
+                            fit_k3=cam_opt_parameters['cal_k3'],
+                            fit_k4=cam_opt_parameters['cal_k4'],
+                            fit_p1=cam_opt_parameters['cal_p1'],
+                            fit_p2=cam_opt_parameters['cal_p2'],
+                            fit_p3=cam_opt_parameters['cal_p3'],
+                            fit_p4=cam_opt_parameters['cal_p4'],
+                            adaptive_fitting = cam_opt_parameters['adaptive_fitting'],
+                            tiepoint_covariance = cam_opt_parameters['tiepoint_covariance'],
+                            fit_corrections = cam_opt_parameters['fit_corrections']
+                            )
     # Check if logging option enabled
     if 'log' in kwargs:
         # check that filename defined
@@ -917,68 +907,6 @@ def parse_command_line_args(parg, doc):
             parg: parsed Arg object with all args formatted.
     """
 
-    # ============== HELPER FUNCTIONS =========================================
-    # function to convert str args to boolean args
-    def str_to_bool(s):
-        """
-        Converts str ['t','true','f','false'] to boolean, not case sensitive.
-        Raises exception if unexpected entry.
-            args:
-                s: str
-            returns:
-                out_boolean: output boolean [True or False]
-        """
-        # remove quotes, commas, and case from s
-        sf = s.lower().replace('"', '').replace("'", '').replace(',', '')
-        # True
-        if sf in ['t', 'true']:
-            out_boolean = True
-        # False
-        elif sf in ['f', 'false']:
-            out_boolean = False
-        # Unexpected arg
-        else:
-            # print exception so it will be visible in console, then raise exception
-            print('ArgumentError: Argument invalid. Expected boolean '
-                  + 'got ' + '"' + str(s) + '"' + ' instead')
-            raise Exception('ArgumentError: Argument invalid. Expected boolean '
-                            + 'got ' + '"' + str(s) + '"' + ' instead')
-        return out_boolean
-
-    # function to convert camera param args to formatted list
-    def cam_arg_to_param_list(cam_arg):
-        """
-        Converts camera parameter argument t formatted list, checks that all args
-        are in expected list not case sensitive.  Doesn't work with quotes.
-        Raises exception if unexpected entry.
-            args:
-                cam_arg: cam_param argument
-            returns:
-                out_cam_list: formatted camera param list
-        """
-        # Create set of all allowed camera optimization parameters
-        cam_allowed = {'f', 'cx', 'cy', 'k1', 'k2', 'k3', 'p1', 'p2', 'k4', 'b1', 'b2', 'p3', 'p4'}
-        # remove trialing commas, quotes, brackets and lowercase all
-        camlist = [x.lower().replace(',', '').replace('"', '').replace('"', '').replace('[', '').replace(']', '') for x
-                   in cam_arg]
-        # check that all values passed are allowed
-        if not set(camlist).issubset(cam_allowed):
-            # print exception so it will be visible in console, then raise exception
-            print('ArgumentError: Camera parameter list argument invalid.\n'
-                  + 'Expected args: [f, cx, cy, k1, k2, k3, k4, b1, b2, p1, p2, p3, p4]\n'
-                  + 'Unexpected arg found instead: ['
-                  + str(set(camlist).difference(cam_allowed)).replace("'", '').replace('{', '').replace('}', '')
-                  + ']\nCheck that list is called without quotes (example: -al_cam_param f, k1, k2)')
-            raise Exception('ArgumentError: Camera parameter list argument invalid.\n'
-                            + 'Expected args: [f, cx, cy, k1, k2, k3, k4, b1, b2, p1, p2, p3, p4]\n'
-                            + 'Unexpected arg found instead: ['
-                            + str(set(camlist).difference(cam_allowed)).replace("'", '').replace('{', '').replace('}',
-                                                                                                                  '')
-                            + ']\nCheck that list is called without quotes (example: -al_cam_param f, k1, k2)')
-        # if all arguments allowed, set out_cam_list
-        out_cam_list = camlist
-        return out_cam_list
-
 
     # ===========================  BEGIN PARSER ==============================
     descriptionstr = ('  Script to run Metashape image alignment, and conduct gradual selection of sparse tiepoints. '
@@ -987,14 +915,10 @@ def parse_command_line_args(parg, doc):
                       'copied to a new chunk and given a suffix of "'"_Align"'", "'"_RU"'", "'"_PA"'", or "'"_RE"'".')
 
     parser = argparse.ArgumentParser(description=descriptionstr, epilog='example: run Align_RuPaRe.py -chunk myChunk '
-                                                                        '-align -al_kplim=50000 '
-                                                                        '-al_generic=False '
-                                                                        '-al_reference=True '
+                                                                        '-align'
                                                                         '-ru -ru_level=11 '
-                                                                        '-ru_cam_param f, cx, cy, k1, k2, k3 '
                                                                         '-pa -pa_level=2 '
                                                                         '-re -re_level=0.3 '
-                                                                        '-re_adapt_cam=False '
                                                                         '-log my_output_logfile.txt')
     # =================== Chunk args ==========================================
     parser.add_argument('-chunk', '--initial_chunk', dest='initial_chunk', nargs='?', const=parg.initial_chunk,
@@ -1010,31 +934,6 @@ def parse_command_line_args(parg, doc):
     parser.add_argument('-align', '--align_images', dest='align', default=False, action='store_true',
                         help='Align images [default=DISABLED].')
 
-    parser.add_argument('-al_acc', '--alignment_accuracy', dest='acc', nargs='?', const=parg.align_accuracy,
-                        type=str,
-                        help='Alignment accuracy (highest, high, medium, low, lowest) [default=high]')
-
-    parser.add_argument('-al_kplim', '--align_keypointlimit', dest='kplim', nargs='?', const=parg.keypointlimit,
-                        type=int,
-                        help='Alignment keypointlimit, set to 0 for unlimited [default=100,000]')
-
-    parser.add_argument('-al_tplim', '--align_tiepointlimit', dest='tplim', nargs='?', const=parg.tiepointlimit,
-                        type=int,
-                        help='Alignment tiepointlimit, set to 0 for unlimited [default=0]')
-
-    # action="store_true" doesn't work for these because need to be able to set false, need to convert str to boolean
-    parser.add_argument('-al_generic', '--align_generic_preselection', dest='gen_preselect', nargs='?',
-                        const=parg.gen_preselect, type=str,
-                        help='Alignment generic preselection [default=True]')
-    # action="store_true" doesn't work for these because need to be able to set false, need to convert str to boolean
-    parser.add_argument('-al_reference', '--align_reference_preselection', dest='ref_preselect', nargs='?',
-                        const=parg.ref_preselect, type=str,
-                        help='Alignment reference preselection [default=False]')
-
-    parser.add_argument('-al_cam_param', '--align_camera_opt_param', dest='al_cam', nargs='*',
-                        help='Camera optimization parameters used for optimization after aligment'
-                             + '[default="'"f"'", "'"cx"'", "'"cy"'", "'"k1"'", "'"k2"'", "'"k3"'", "'"p1"'", "'"p2"'"]')
-
     # =================== RU args =============================================
     parser.add_argument('-ru', '--reconstruction_uncertainty', dest='ru', default=False, action='store_true',
                         help='Reconstruction Uncertainty [default=DISABLED]')
@@ -1042,10 +941,6 @@ def parse_command_line_args(parg, doc):
     parser.add_argument('-ru_level', '--reconstruction_uncertainty_level', dest='ru_level', nargs='?',
                         const=parg.ru_filt_level, type=float,
                         help='Reconstruction Uncertainty filter level, optimum value 10-15 [default=10]')
-
-    parser.add_argument('-ru_cam_param', '--ru_camera_opt_param', dest='ru_cam', nargs='*',
-                        help='Camera optimization parameters used for optimization during RU iterations'
-                             + '[default="'"f"'", "'"cx"'", "'"cy"'", "'"k1"'", "'"k2"'", "'"k3"'", "'"p1"'", "'"p2"'"]')
 
     # =================== PA args =============================================
     parser.add_argument('-pa', '--projection_accuracy', dest='pa', default=False, action='store_true',
@@ -1055,10 +950,6 @@ def parse_command_line_args(parg, doc):
                         const=parg.pa_filt_level, type=float,
                         help='Projection Accuracy filter level, optimum value 2-4 [default=3]')
 
-    parser.add_argument('-pa_cam_param', '--pa_camera_opt_param', dest='pa_cam', nargs='*',
-                        help='Camera optimization parameters used for optimization during PA iterations'
-                             + '[default="'"f"'", "'"cx"'", "'"cy"'", "'"k1"'", "'"k2"'", "'"k3"'", "'"p1"'", "'"p2"'"]')
-
     # =================== RE args =============================================
     parser.add_argument('-re', '--reprojection_error', dest='re', default=False, action='store_true',
                         help='Reprojection Error, optimum value 0.3 [default=0.3]')
@@ -1067,21 +958,6 @@ def parse_command_line_args(parg, doc):
                         const=parg.re_filt_level, type=float,
                         help='Projection Accuracy filter level, optimum value 2-4 [default=3]')
 
-    parser.add_argument('-re_cam_param', '--re_camera_opt_param', dest='re_cam', nargs='*',
-                        help='Camera optimization parameters used for optimization during RE iterations'
-                             + '[default="'"f"'", "'"cx"'", "'"cy"'", "'"k1"'", "'"k2"'", "'"k3"'", "'"p1"'", "'"p2"'"]')
-
-    parser.add_argument('-re_adapt_cam', '--re_adaptive_cam', dest='re_adapt', nargs='?',
-                        const=parg.re_adapt, type=str,
-                        help='Enable adaptive camera optimization parameters at RE pixel threshold [default=True]')
-
-    parser.add_argument('-re_adapt_level', '--re_adaptive_cam_level', dest='re_adapt_level', nargs='?',
-                        const=parg.re_adapt_level, type=float,
-                        help='RE pixel threshold below which to enable adapted camera parameters [default=1]')
-
-    parser.add_argument('-re_adapt_cam_param', '--re_adapt_camera_param', dest='re_adapt_add_cam_param', nargs='*',
-                        help='Additional camera optimization parameters used when below RE pixel threshold'
-                             + '[default="'"k4"'", "'"b1"'", "'"b2"'", "'"p3"'", "'"p4"'"]')
     parser.add_argument('-pcbuild', '--pcbuild', dest='pcbuild', default=False, action='store_true',
                     help='Build point cloud [default=DISABLED]')
     # =================== Export args =========================================
@@ -1122,137 +998,39 @@ def parse_command_line_args(parg, doc):
     # -----------------Align arguments-----------------------
     if arglist.align:
         parg.align = True
-    # Check if any -align options called without -align argument
-    alargs = [arglist.acc, arglist.gen_preselect, arglist.ref_preselect, arglist.kplim, arglist.tplim, arglist.al_cam]
-    if any(alargs) and not arglist.align:
-        # an -al argument was called without -align also being called, raise exception
-        # print exception so it will be visible in console, then raise exception
-        print('ArgumentError: an -alignment (-al) option was called without the --align_images(-al) also being called.')
-        raise Exception(
-            'ArgumentError: an -alignment (-al) option was called without the --align_images(-al) also being called.')
-
-    # alignment accuracy
-    if arglist.acc is not None:
-        # remove possible quotes
-        accopt = arglist.acc.replace('"', '').replace("'", '')
-    else:
-        # use default
-        accopt = parg.align_accuracy
-
-    # capitalize and check that keyword is valid
-    if not accopt.capitalize() in ['Highest', 'High', 'Medium', 'Low', 'Lowest']:
-        # print exception so it will be visible in console, then raise exception
-        print('ArgumentError: --alignment_accuracy argument invalid. Expected'
-              + '[''Highest'', ''High'', ''Medium'', ''Low'', ''Lowest''], got ' + str(accopt) + ' instead')
-        raise Exception('ArgumentError: --alignment_accuracy argument invalid. Expected'
-                        + '[''Highest'', ''High'', ''Medium'', ''Low'', ''Lowest''], got ' + str(accopt) + ' instead')
-
-    # append 'Accuracy' for required Metashape argument formatting
-    parg.align_accuracy = accopt.capitalize() + 'Accuracy'
-
-    # keypoint limit
-    if arglist.kplim is not None:
-        parg.keypointlimit = arglist.kplim
-
-    # tiepoint limit
-    if arglist.tplim is not None:
-        parg.tiepointlimit = arglist.tplim
-
-    # generic preselection
-    if arglist.gen_preselect is not None:
-        # convert arg to boolean
-        parg.gen_preselect = str_to_bool(arglist.gen_preselect)
-
-    # reference preselection
-    if arglist.ref_preselect is not None:
-        # convert arg to boolean
-        parg.ref_preselect = str_to_bool(arglist.ref_preselect)
 
     # align camera optimization parameters
-    if arglist.al_cam is not None:
-        parg.al_cam_opt_param = cam_arg_to_param_list(arglist.al_cam)
 
     # -----------------RU arguments-----------------------
     if arglist.ru:
         # set ru to true
         parg.ru = True
-    # Check if any -ru options called without -ru argument
-    ruargs = [arglist.ru_level, arglist.ru_cam]
-    if any(ruargs) and not arglist.ru:
-        # an -ru argument was called without -ru also being called, raise exception
-        # print exception so it will be visible in console, then raise exception
-        print(
-            'ArgumentError: a -ru option was called without the --reconstruction_uncertainty argument(-ru) also being called.')
-        raise Exception(
-            'ArgumentError: a -ru option was called without the --reconstruction_uncertainty argument(-ru) also being called.')
 
     # RU filter level
     if arglist.ru_level is not None:
         parg.ru_filt_level = arglist.ru_level
 
-    # RU camera optimization parameters
-    if arglist.ru_cam is not None:
-        parg.ru_cam_opt_param = cam_arg_to_param_list(arglist.ru_cam)
 
     # -----------------PA arguments-----------------------
     if arglist.pa:
         # set pa to true
         parg.pa = True
     # Check if any -pa options called without -ru argument
-    paargs = [arglist.pa_level, arglist.pa_cam]
-    if any(paargs) and not arglist.pa:
-        # a -pa argument was called without -pa also being called, raise exception
-        # print exception so it will be visible in console, then raise exception
-        print(
-            'ArgumentError: a -pa option was called without the --projection_accuracy argument(-pa)  also being called.')
-        raise Exception(
-            'ArgumentError: a -pa option was called without the --projection_accuracy argument(-pa) also being called.')
 
     # PA filter level
     if arglist.pa_level is not None:
         parg.pa_filt_level = arglist.pa_level
 
-    # PA camera optimization parameters
-    if arglist.pa_cam is not None:
-        parg.pa_cam_opt_param = cam_arg_to_param_list(arglist.pa_cam)
 
     # -----------------RE arguments-----------------------
     if arglist.re:
         # set re to true
         parg.re = True
     # Check if any -re options called without -ru argument
-    reargs = [arglist.re_level, arglist.re_cam, arglist.re_adapt, arglist.re_adapt_level,
-              arglist.re_adapt_add_cam_param]
-    if any(reargs) and not arglist.re:
-        # a -re argument was called without -re also being called, raise exception
-        # print exception so it will be visible in console, then raise exception
-        print(
-            'ArgumentError: a -re option was called without the --reprojection_error argument(-re) also being called.')
-        raise Exception(
-            'ArgumentError: a -re option was called without the --reprojection_error argument(-re) also being called.')
-
+    
     # RE filter level
     if arglist.re_level is not None:
         parg.re_filt_level = arglist.re_level
-
-    # RE camera optimization parameters
-    if arglist.re_cam is not None:
-        parg.re_cam_opt_param = cam_arg_to_param_list(arglist.re_cam)
-
-    # RE adapt camera enable/disable
-    if arglist.re_adapt is not None:
-        parg.re_adapt = str_to_bool(arglist.re_adapt)
-
-    # RE adapt camera level
-    if arglist.re_adapt_level is not None:
-        parg.re_adapt_level = arglist.re_adapt_level
-
-    # RE adapt camera optimization parameters
-    # initialize new cam_param list, then change if called in defaults/command line args
-    parg.re_adapted_cam_param = parg.re_cam_opt_param + parg.re_adapt_add_cam_param
-    if arglist.re_adapt_add_cam_param is not None:
-        parg.re_adapt_add_cam_param = cam_arg_to_param_list(arglist.re_adapt_add_cam_param)
-        parg.re_adapted_cam_param = parg.re_cam_opt_param + parg.re_adapt_add_cam_param
 
     if arglist.pcbuild:
         parg.pcbuild = True
@@ -1293,36 +1071,29 @@ def parse_command_line_args(parg, doc):
         align_params = parg.alignment_params
         for key in align_params:
             print(f"    -{key}: {align_params[key]}")
-            print(f"    -camera optimization parameters: {parg.al_cam_opt_param}")
+
     else:
         print('2. Alignment DISABLED.')
 
     # ru message
     if parg.ru:
         print('3. Reconstruction Uncertainty gradual selection ENABLED with the following options:\n'
-              + '    -RU filter level = ' + str(parg.ru_filt_level) + '\n'
-              + '    -camera optimization parameters: ' + str(parg.ru_cam_opt_param))
+              + '    -RU filter level = ' + str(parg.ru_filt_level) + '\n')
     else:
         print('3. Reconstruction Uncertainty gradual selection DISABLED.')
 
     # pa message
     if parg.pa:
         print('4. Projection Accuracy gradual selection ENABLED with the following options:\n'
-              + '    -PA filter level = ' + str(parg.pa_filt_level) + '\n'
-              + '    -camera optimization parameters: ' + str(parg.pa_cam_opt_param))
+              + '    -PA filter level = ' + str(parg.pa_filt_level) + '\n')
     else:
         print('4. Projection Accuracy gradual selection DISABLED.')
 
     # re message
     if parg.re:
         print('5. Reprojection Error gradual selection ENABLED with the following options:\n'
-              + '    -RE filter level = ' + str(parg.re_filt_level) + '\n'
-              + '    -camera optimization parameters: ' + str(parg.re_cam_opt_param))
-        if parg.re_adapt:
-            print('    -adaptive camera opt. params ENABLED, when Reprojection Error below '
-                  + str(parg.re_adapt_level) + ' pixels\n'
-                  + '    -adapted camera opt. parameters: '
-                  + str(parg.re_cam_opt_param + parg.re_adapt_add_cam_param))
+              + '    -RE filter level = ' + str(parg.re_filt_level) + '\n')
+        
     else:
         print('5. Reprojection Error gradual selection DISABLED.')
 
@@ -1630,7 +1401,8 @@ def calc_camera_accuracy(chunk):
         camera_acc = camera.reference.accuracy[2] # Change index to 0 and 1 for lateral accuracy
         sums += camera_acc
         num += 1
-    return sums / num
+    if num > 0: return sums / num
+    else: return 0
 
 def calc_RMS_error(chunk):
      tie_points= chunk.tie_points
@@ -1667,8 +1439,9 @@ def calc_RMS_error(chunk):
                if error > maxe: maxe = error
 				
      sigma = math.sqrt(err_sum / num)
-     return (sigma) # can also add math.sqrt(maxe) to return statement to get the max error 
-
+     if num > 0: return sigma
+     else: return 0
+    
 def main(parg, doc):
     """
     args:
@@ -1709,22 +1482,6 @@ def main(parg, doc):
             raise Exception('This project has not been saved/named. Please save it before running this '
                                                                 'script. Stopping execution.')
 
-        # Initialize camera optimization parameters with all params false. 
-        # This will be copied and changed for use in each function
-        blank_cam_opt_parameters = {'cal_f': False,
-                                    'cal_cx': False,
-                                    'cal_cy': False,
-                                    'cal_b1': False,
-                                    'cal_b2': False,
-                                    'cal_k1': False,
-                                    'cal_k2': False,
-                                    'cal_k3': False,
-                                    'cal_k4': False,
-                                    'cal_p1': False,
-                                    'cal_p2': False,
-                                    'cal_p3': False,
-                                    'cal_p4': False}
-
         
         user_tags = parg.user_tags
         flight_folders = parg.flight_folders
@@ -1764,13 +1521,6 @@ def main(parg, doc):
             align_chunk.label = chunk.label + '_Align'
             print('Copied chunk ' + chunk.label + ' to chunk ' + align_chunk.label)
 
-            # Set camera optimization parameters.
-            # make a dictionary of camera opt params using arguments from parg
-            al_cam_param = blank_cam_opt_parameters.copy()
-            # loop through all cam parameters in parg list and set called params to True
-            for elem in parg.al_cam_opt_param:
-                al_cam_param['cal_{}'.format(elem)] = True
-
             # Run alignment using align_images function
             print('Aligning images')
             geo_ref_list = geo_ref_dict[psx] 
@@ -1787,7 +1537,6 @@ def main(parg, doc):
                     for key in align_params:
                         f.write(f"    -{key}: {align_params[key]}\n")
                     
-                # execute function
                 align_images(align_chunk, parg.alignment_params)
             else:
                 align_images(align_chunk, parg.alignment_params)
@@ -1819,13 +1568,6 @@ def main(parg, doc):
             print('Copied chunk ' + chunk.label + ' to chunk ' + ru_chunk.label)
             doc.save()
 
-            # Set camera optimization parameters.
-            # make a dictionary of camera opt params using arguments from parg
-            ru_cam_param = blank_cam_opt_parameters.copy()
-            # loop through all cam parameters in parg list and set called params to True
-            for elem in parg.ru_cam_opt_param:
-                ru_cam_param['cal_{}'.format(elem)] = True
-
             # Run Reconstruction Uncertainty using reconstruction_uncertainty function
             print('Running Reconstruction Uncertainty optimization')
             if parg.log:
@@ -1837,10 +1579,10 @@ def main(parg, doc):
                     f.write("============= RECONSTRUCTION UNCERTAINTY =============\n")
                     f.write("Copied chunk " + chunk.label + " to chunk " + ru_chunk.label + "\n")
                 # execute function
-                reconstruction_uncertainty(ru_chunk, parg.ru_filt_level, parg.ru_cutoff, parg.ru_increment, ru_cam_param,
+                reconstruction_uncertainty(ru_chunk, parg.ru_filt_level, parg.ru_cutoff, parg.ru_increment, parg.cam_opt_param, 
                                         log=True, proclog=parg.proclogname)
             else:
-                reconstruction_uncertainty(ru_chunk, parg.ru_filt_level, parg.ru_cutoff, parg.ru_increment, ru_cam_param)
+                reconstruction_uncertainty(ru_chunk, parg.ru_filt_level, parg.ru_cutoff, parg.ru_increment, parg.cam_opt_param)
             doc.save()
 
         # PROJECTION ACCURACY
@@ -1863,12 +1605,6 @@ def main(parg, doc):
             pa_chunk.label = chunk.label + '_PA' + str(parg.pa_filt_level)
             print('Copied chunk ' + chunk.label + ' to chunk ' + pa_chunk.label)
 
-            # Set camera optimization parameters.
-            # make a dictionary of camera opt params using arguments from parg
-            pa_cam_param = blank_cam_opt_parameters.copy()
-            # loop through all cam parameters in parg list and set called params to True
-            for elem in parg.pa_cam_opt_param:
-                pa_cam_param['cal_{}'.format(elem)] = True
 
             # Run Projection Accuracy using projection_accuracy function
             print('Running Projection Accuracy optimization')
@@ -1880,81 +1616,55 @@ def main(parg, doc):
                     f.write("\n============= PROJECTION ACCURACY=============\n")
                     f.write("Copied chunk " + chunk.label + " to chunk " + pa_chunk.label + "\n")
                 # execute function
-                projection_accuracy(pa_chunk, parg.pa_filt_level, parg.pa_cutoff, parg.pa_increment, pa_cam_param, log=True,
+                projection_accuracy(pa_chunk, parg.pa_filt_level, parg.pa_cutoff, parg.pa_increment, parg.cam_opt_param, log=True,
                                     proclog=parg.proclogname)
             else:
-                projection_accuracy(pa_chunk, parg.pa_filt_level, parg.pa_cutoff, parg.pa_increment, pa_cam_param)
+                projection_accuracy(pa_chunk, parg.pa_filt_level, parg.pa_cutoff, parg.pa_increment, parg.cam_opt_param)
             doc.save()
 
         # REPROJECTION ERROR
         if parg.re:
             chunk_label_list = [chunk.label for chunk in doc.chunks]
             #chunk = activate_chunk(doc, chunk_label_list[-1])
-            chunk = activate_chunk(doc, "Raw_Photos_Align_RU10_PA3")
-            R1_opt = 30 # number of optimizations for round 1
-            R2_opt = 7 # number of optimizations for round 2
-            R2_TPA_ls = [0.1]
+            chunk = activate_chunk(doc, f"Raw_Photos_Align_RU{parg.ru_filt_level}_PA{parg.pa_filt_level}")
+            R1_opt = parg.re_round1_opt # number of optimizations for round 1
+            R2_opt = parg.re_round2_opt # number of optimizations for round 2
+            R2_TPA = parg.re_round2_TPA # TPA for round 2
+            RMSE_goal = parg.re_RMSE_goal
             SEUW_dict = {}
             RMSE_dict = {}
             # check that chunk has a point cloud
-            for R2_TPA in R2_TPA_ls:
-                try:
-                    len(chunk.tie_points.points)
-                except AttributeError:
-                    # print exception so it will be visible in console
-                    print('AttributeError: Chunk "' + chunk.label + '" has no point cloud. Ensure that image '
-                                                                    'alignment was performed. Stopping execution.')
-                    raise AttributeError('Chunk "' + chunk.label + '" has no point cloud. Ensure that image alignment '
-                                                                'was performed. Stopping execution.')
+            try:
+                len(chunk.tie_points.points)
+            except AttributeError:
+                # print exception so it will be visible in console
+                print('AttributeError: Chunk "' + chunk.label + '" has no point cloud. Ensure that image '
+                                                                'alignment was performed. Stopping execution.')
+                raise AttributeError('Chunk "' + chunk.label + '" has no point cloud. Ensure that image alignment '
+                                                            'was performed. Stopping execution.')
+            # copy active chunk, rename, make active
+            label = chunk.label
+            re_chunk = chunk.copy()
+            re_chunk.label = f"{label}_RE{parg.re_filt_level}_TPA{R2_TPA}"
+            print('Copied chunk ' + chunk.label + ' to chunk ' + re_chunk.label)
 
-                # copy active chunk, rename, make active
-                label = chunk.label
-                re_chunk = chunk.copy()
-                re_chunk.label = f"{label}_RE{parg.re_filt_level}_TPA{R2_TPA}"
-                print('Copied chunk ' + chunk.label + ' to chunk ' + re_chunk.label)
-
-                # Set INITIAL camera optimization parameters.
-                # make a dictionary of camera opt params using arguments from parg
-                re_cam_param = blank_cam_opt_parameters.copy()
-                # loop through all cam parameters in parg list and set called params to True
-                for elem in parg.re_cam_opt_param:
-                    re_cam_param['cal_{}'.format(elem)] = True
-
-                # if re_adapt_camera, make cam_param for that also
-                if parg.re_adapt:
-                    # make a dictionary of camera opt params using arguments from parg
-                    re_adapted_cam_param = blank_cam_opt_parameters.copy()
-                    # loop through all cam parameters in parg list and set called params to True
-                    for elem in parg.re_adapted_cam_param:
-                        re_adapted_cam_param['cal_{}'.format(elem)] = True
-
-                # Run Reprojection Error using reprojection_error function
-                print('Running Reprojection Error optimization')
-                if parg.log:
-                    # if logging enabled use kwargs
-                    print('Logging to file ' + parg.proclogname)
-                    # write input and output chunk to log file
-                    with open(parg.proclogname, 'a') as f:
-                        f.write("\n")
-                        f.write("============= REPROJECTION ERROR =============\n")
-                        f.write("Copied chunk " + chunk.label + " to chunk " + re_chunk.label + "\n")
-                    # execute function, give additional kwargs if re_adapt_cam_opt enabled
-                    if parg.re_adapt:
-                        reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, R1_opt, R2_opt, R2_TPA, log=True,
-                                    proclog=parg.proclogname, adapt_cam_opt=parg.re_adapt, adapt_cam_level=parg.re_adapt_level,
-                                    adapt_cam_param=re_adapted_cam_param)
-                    else:
-                        reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, R1_opt, R2_opt, R2_TPA, log=True,
-                                    proclog=parg.proclogname)
-                else:
-                    if parg.re_adapt:
-                        reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, 
-                                        R1_opt, R2_opt, R2_TPA, adapt_cam_opt=parg.re_adapt, adapt_cam_level=parg.re_adapt_level,
-                                        adapt_cam_param=re_adapted_cam_param)
-                    else:
-                        reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, re_cam_param, R1_opt, R2_opt, R2_TPA,)
-            
-                doc.save()
+            # Run Reprojection Error using reprojection_error function
+            print('Running Reprojection Error optimization')
+            if parg.log:
+                # if logging enabled use kwargs
+                print('Logging to file ' + parg.proclogname)
+                # write input and output chunk to log file
+                with open(parg.proclogname, 'a') as f:
+                    f.write("\n")
+                    f.write("============= REPROJECTION ERROR =============\n")
+                    f.write("Copied chunk " + chunk.label + " to chunk " + re_chunk.label + "\n")
+                # execute function, give additional kwargs if re_adapt_cam_opt enabled
+                reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, parg.cam_opt_param, RMSE_goal, R1_opt, R2_opt, R2_TPA, log=True,
+                                proclog=parg.proclogname)
+            else:
+                reprojection_error(re_chunk, parg.re_filt_level, parg.re_cutoff, parg.re_increment, parg.cam_opt_param, RMSE_goal, R1_opt, R2_opt, R2_TPA)
+        
+            doc.save()
 
         if parg.pcbuild:
             print("----------------------------------------------------------------------------------------")
@@ -1962,7 +1672,8 @@ def main(parg, doc):
             maxconf = parg.maxconf
             print("Building Point Clouds")
             chunk_label_list = [chunk.label for chunk in doc.chunks]
-            post_error_chunk_list = [chunk for chunk in chunk_label_list if chunk.endswith("_RE0.3")]
+            post_error_chunk = f"Raw_Photos_Align_RU{parg.ru_filt_level}_PA{parg.pa_filt_level}_RE{parg.re_filt_level}_TPA{R2_TPA}"
+            post_error_chunk_list = [chunk for chunk in chunk_label_list if chunk.endswith(post_error_chunk)]
             print("Chunks to process: " + str(post_error_chunk_list))
             if len(post_error_chunk_list) == 0:
                 post_error_chunk_list = [chunk.label]
