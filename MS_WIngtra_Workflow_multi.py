@@ -1641,7 +1641,7 @@ def main(parg, doc):
             maxconf = parg.maxconf
             print("Building Point Clouds")
             chunk_label_list = [chunk.label for chunk in doc.chunks]
-            post_error_chunk = f"Raw_Photos_Align_RU{parg.ru_filt_level}_PA{parg.pa_filt_level}_RE{parg.re_filt_level}_TPA{R2_TPA}"
+            post_error_chunk = f"Raw_Photos_Align_RU{parg.ru_filt_level}_PA{parg.pa_filt_level}_RE{parg.re_filt_level}_TPA{parg.re_round2_TPA}"
             post_error_chunk_list = [chunk for chunk in chunk_label_list if chunk.endswith(post_error_chunk)]
             print("Chunks to process: " + str(post_error_chunk_list))
             if len(post_error_chunk_list) == 0:
