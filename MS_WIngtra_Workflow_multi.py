@@ -201,7 +201,7 @@ defaults.ru_filt_level = 10         # ru gradual selection filter level (default
 
 # ------------Projection Accuracy (pa) defaults ---------------------------------------
 defaults.pa = False                 # run pa gradual selection iterations
-defaults.pa_filt_level = 2          # pa gradual selection filter level (default=3, optimum value: [2-4])
+defaults.pa_filt_level = 2.5          # pa gradual selection filter level (default=3, optimum value: [2-4])
 
 # ------------Reprojection Error (re) defaults -----------------------------------------
 defaults.re = False                 # run re gradual selection iterations
@@ -1420,6 +1420,8 @@ def main(parg, doc):
           doc = active Metashape.app.document object
           parg = Arg object with formatted argument attributes
     """
+    if len(parg.psx_list) == 0:
+        parg.psx_list = [doc.path]
     for psx_file in parg.psx_list:
         # Open the project file
         processing_start = datetime.now()
