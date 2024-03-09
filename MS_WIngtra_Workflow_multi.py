@@ -201,7 +201,7 @@ defaults.alignment_params = {
         "max_workgroup_size": 100
     }
 
-defaults.cam_opt_parameters = {
+defaults.cam_opt_param = {
         "cal_f": True,
         "cal_cx": True,
         "cal_cy": True,
