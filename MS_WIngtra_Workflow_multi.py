@@ -692,7 +692,7 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
     noptimized_round2 = 1
     ninc_reduced = 0
     accuracy = calc_camera_accuracy(chunk)
-
+    error = calc_camera_error(chunk)
     while (RMSE < RMSE_goal or error > accuracy) and (len(chunk.tie_points.points) > init_pointcount * 0.4):
         threshold_re = re_filt_level_param - 0.2 # set low threshold so 10% of points are removed  every iteration
         metadata = chunk.meta
