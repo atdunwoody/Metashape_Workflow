@@ -201,15 +201,15 @@ defaults.ru_filt_level = 10         # ru gradual selection filter level (default
 
 # ------------Projection Accuracy (pa) defaults ---------------------------------------
 defaults.pa = False                 # run pa gradual selection iterations
-defaults.pa_filt_level = 2.5          # pa gradual selection filter level (default=3, optimum value: [2-4])
+defaults.pa_filt_level = 3          # pa gradual selection filter level (default=3, optimum value: [2-4])
 
 # ------------Reprojection Error (re) defaults -----------------------------------------
 defaults.re = False                 # run re gradual selection iterations
 defaults.re_filt_level = 0.3        # re gradual selection filter level (default=0.3, optimum value: [0.3])
 defaults.re_round1_opt = 30          # max number of camera optimization iterations in round 1 (default=5)
-defaults.re_round2_opt = 10          # max number of camera optimization iterations in round 2 (default=5)
+defaults.re_round2_opt = 12          # max number of camera optimization iterations in round 2 (default=5)
 defaults.re_round2_TPA = 0.1
-defaults.re_RMSE_goal = 0.145
+defaults.re_RMSE_goal = 0.18
 
 # adjust camera optimization parameters when RE level is below threshold
 defaults.re_adapt = False            # enable adaptive camera opt params (default=True)
@@ -306,7 +306,7 @@ def reconstruction_uncertainty(chunk, ru_filt_level_param, ru_cutoff, ru_increme
     points = chunk.tie_points.points
     init_pointcount = len([True for point in points if point.valid is True])
 
-    while len(chunk.tie_points.points) > init_pointcount * 0.5:
+    while len(chunk.tie_points.points) > init_pointcount * 0.6 and noptimized < 1:
         # define threshold variables
         points = chunk.tie_points.points
         f = Metashape.TiePoints.Filter()
@@ -423,7 +423,7 @@ def projection_accuracy(chunk, pa_filt_level_param, pa_cutoff, pa_increment, cam
     points = chunk.tie_points.points
     init_pointcount = len([True for point in points if point.valid is True])
 
-    while len(chunk.tie_points.points) > init_pointcount * 0.5:
+    while len(chunk.tie_points.points) > init_pointcount * 0.6 and noptimized < 1:
         # define threshold variables
         points = chunk.tie_points.points
         f = Metashape.TiePoints.Filter()
@@ -557,7 +557,7 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                 f.write(f"Max {round1_max_optimizations} iterations will be performed in the first round to prevent overfitting.\n")
                 f.write(f"Tie Point Accuracy: {chunk.tiepoint_accuracy:.2f}\n")
 
-    while len(chunk.tie_points.points) > init_pointcount * 0.4:
+    while len(chunk.tie_points.points) > init_pointcount * 0.25:
 
         metadata = chunk.meta
         SEUW = float(metadata['OptimizeCameras/sigma0'])
@@ -691,14 +691,13 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                 f.write(f"A max of {round2_max_optimizations} iterations will be performed in the second round.\n")
     noptimized_round2 = 1
     ninc_reduced = 0
-    accuracy = calc_camera_accuracy(chunk)
-    error = calc_camera_error(chunk)
-    while (RMSE < RMSE_goal or error > accuracy) and (len(chunk.tie_points.points) > init_pointcount * 0.4):
-        threshold_re = re_filt_level_param - 0.2 # set low threshold so 10% of points are removed  every iteration
+    points = chunk.tie_points.points
+    R2_pointcount = len([True for point in points if point.valid is True])
+    while (RMSE > RMSE_goal) and (R2_pointcount > (init_pointcount * 0.25)):
+        threshold_re = re_filt_level_param - 0.25 # set low threshold so 10% of points are removed  every iteration
         metadata = chunk.meta
         SEUW = float(metadata['OptimizeCameras/sigma0'])
         RMSE = calc_RMS_error(chunk)
-        error = calc_camera_error(chunk)
 
         if 'log' in kwargs:
             # check that filename defined
@@ -712,6 +711,7 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
                     f.write(f"     -RMSE: {RMSE:.4f}\n")
         # define threshold variables
         points = chunk.tie_points.points
+        R2_pointcount = len([True for point in points if point.valid is True])
         refilt = Metashape.TiePoints.Filter()
        
         print("initializing with RE =", threshold_re)
