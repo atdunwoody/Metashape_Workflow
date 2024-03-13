@@ -167,7 +167,7 @@ defaults.alignment_params = {
         "tiepoint_limit": 10000, #Default = 4000, 10000 for high quality images
         "keep_keypoints": False,
         "guided_matching": True,
-        "reset_matches": False,
+        "reset_matches": True,
         "subdivide_task": True,
         "workitem_size_cameras": 20,
         "workitem_size_pairs": 80,
