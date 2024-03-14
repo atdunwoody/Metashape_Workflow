@@ -157,7 +157,7 @@ defaults.alignment_params = {
         "downscale": 1, # 0 = Highest, 1 = High, 2 = Medium, 3 = Low, 4 = Lowest
         "generic_preselection": True, # Default is True, speeds up alignment
         "reference_preselection": True, #Default is True, reference preselection enabled
-        #Commented out below because it is default parameter and Python can't pickle the Metashape.ReferencePreselectionSource object
+        #Commented out below because it is already set to default parameter and Python can't pickle the Metashape.ReferencePreselectionSource object
         #"reference_preselection_mode": Metashape.ReferencePreselectionSource, # Source uses reference coordinates
         "filter_mask": False,
         "mask_tiepoints": True,
@@ -1642,6 +1642,7 @@ def main(parg, doc):
             print("Building Point Clouds")
             chunk_label_list = [chunk.label for chunk in doc.chunks]
             post_error_chunk = f"Raw_Photos_Align_RU{parg.ru_filt_level}_PA{parg.pa_filt_level}_RE{parg.re_filt_level}_TPA{parg.re_round2_TPA}"
+            pc_chunk = f"{post_error_chunk}_PCFiltered"
             post_error_chunk_list = [chunk for chunk in chunk_label_list if chunk.endswith(post_error_chunk)]
             print("Chunks to process: " + str(post_error_chunk_list))
             if len(post_error_chunk_list) == 0:
