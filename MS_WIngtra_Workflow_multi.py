@@ -117,7 +117,7 @@ defaults = Args()
 # ------------Chunk defaults -------------------------------------------------------
 defaults.initial_chunk = 'active'    # Name of first chunk to operate on ('active' = active chunk)
 defaults.export_dir = None        # path to input directory where all psx folders will be processed
-defaults.user_tags = ['MM']             # list of user tags to process
+defaults.user_tags = ['LPM']             # list of user tags to process
 defaults.flight_folders = [
     r"Z:\ATD\Drone Data Processing\Drone Images\East_Troublesome\Flights\102123", # LM2, LPM, MM, MPM, UM1, UM2
     r"Z:\JTM\Wingtra\WingtraPilotProjects\070923 Trip", # LM2, LPM, MM, MPM, UM1, UM2
@@ -129,21 +129,9 @@ defaults.flight_folders = [
     r"Z:\JTM\Wingtra\WingtraPilotProjects\081222 Trip" # LM2, LPM
     #r"Z:\JTM\Wingtra\WingtraPilotProjects\071922 Trip" # UM1, UM2
                            ]         # list of photo folders to process
-defaults.psx_list =[
-    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LM2_all_102023.psx"
-    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023.psx",
-    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023_all_checked.psx",
-    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\Low_CoReg_All.psx"
-    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_all_102023_last_checked.psx",
-    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MM_all_102023.psx",
-    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\LPM_Intersection.psx",
-    ##r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\LPM_10_2023\LPM_Intersection_v2.psx",
-    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\MM_all_102023_align60k.psx",
-    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\MPM_all_102023.psx",
-    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\UM1_all_102023.psx",
-    #r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\10_2023\UM2_all_102023.psx",
-    
-]
+defaults.psx_list ={
+    'LPM': r"Z:\JTM\Wingtra\WingtraPilotProjects\WingtraPilotProjects.psx", #for setup, {user tag: psx project filepath}
+}
 defaults.geoid = r"Z:\JTM\Metashape\us_noaa_g2018u0.tif"              # path to geoid file
 defaults.dem_resolution = 0
 defaults.ortho_resolution = 0
@@ -1422,7 +1410,7 @@ def main(parg, doc):
     """
     if len(parg.psx_list) == 0:
         parg.psx_list = [doc.path]
-    for psx_file in parg.psx_list:
+    for user_tag, psx_file in parg.psx_list:
         # Open the project file
         processing_start = datetime.now()
         if parg.log:
@@ -1456,8 +1444,7 @@ def main(parg, doc):
             raise Exception('This project has not been saved/named. Please save it before running this '
                                                                 'script. Stopping execution.')
 
-        
-        user_tags = parg.user_tags
+
         flight_folders = parg.flight_folders
         psx = doc.path
         psx_name = os.path.splitext(os.path.basename(psx))[0]
@@ -1466,21 +1453,21 @@ def main(parg, doc):
         if parg.setup:
             geo_ref_dict = {}
             print(f"Flight Folders: {flight_folders}")
-            print(f"User Tags: {user_tags}")
+            print(f"User Tags: {user_tag}")
             if parg.log:
                 print('Logging to file ' + parg.proclogname)
                 with open(parg.proclogname, 'a') as f:
                     f.write("============= SETUP =============\n")
                     f.write("PSX: " + psx + "\n")
                     f.write("Flight Folders: " + str(flight_folders) + "\n")
-                    f.write("User Tags: " + str(user_tags) + "\n")
+                    f.write("User Tags: " + str(user_tag) + "\n")
                     
 
-            geo_ref_list, chunk = setup_psx(user_tags,flight_folders, doc)
+            geo_ref_list, chunk = setup_psx(user_tag,flight_folders, doc)
             geo_ref_dict[psx] = geo_ref_list
         else:
             geo_ref_dict = {}
-            geo_ref_list, chunk = setup_psx(user_tags, flight_folders, doc, load_photos = False)
+            geo_ref_list, chunk = setup_psx(user_tag, flight_folders, doc, load_photos = False)
             geo_ref_dict[psx] = geo_ref_list
             
         doc.save(psx)
