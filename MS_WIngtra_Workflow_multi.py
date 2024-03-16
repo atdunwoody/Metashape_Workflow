@@ -129,9 +129,10 @@ defaults.flight_folders = [
     r"Z:\JTM\Wingtra\WingtraPilotProjects\081222 Trip" # LM2, LPM
     #r"Z:\JTM\Wingtra\WingtraPilotProjects\071922 Trip" # UM1, UM2
                            ]         # list of photo folders to process
-defaults.psx_list ={
-    'LPM': r"Z:\JTM\Wingtra\WingtraPilotProjects\WingtraPilotProjects.psx", #for setup, {user tag: psx project filepath}
+defaults.psx_dict ={
+    "LPM": r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\LPM_10_2023\LPM_Intersection_PA3_RMSE_018_two_checked.psx" #for setup, {user tag: psx project filepath}
 }
+
 defaults.geoid = r"Z:\JTM\Metashape\us_noaa_g2018u0.tif"              # path to geoid file
 defaults.dem_resolution = 0
 defaults.ortho_resolution = 0
@@ -1408,9 +1409,11 @@ def main(parg, doc):
           doc = active Metashape.app.document object
           parg = Arg object with formatted argument attributes
     """
-    if len(parg.psx_list) == 0:
-        parg.psx_list = [doc.path]
-    for user_tag, psx_file in parg.psx_list:
+    if len(parg.psx_dict) == 0:
+        parg.psx_dict = {'_': doc.path}
+        print(len(parg.psx_dict))
+        print(parg.psx_dict)
+    for user_tag, psx_file in parg.psx_dict.items():
         # Open the project file
         processing_start = datetime.now()
         if parg.log:
