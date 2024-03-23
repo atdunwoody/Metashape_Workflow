@@ -117,20 +117,22 @@ defaults = Args()
 # ------------Chunk defaults -------------------------------------------------------
 defaults.initial_chunk = 'active'    # Name of first chunk to operate on ('active' = active chunk)
 defaults.export_dir = None        # path to input directory where all psx folders will be processed
-defaults.user_tag = 'LPM'             # list of user tags to process
+defaults.user_tag = 'ME'             # list of user tags to process
 defaults.flight_folders = [
-   # r"Z:\ATD\Drone Data Processing\Drone Images\East_Troublesome\Flights\102123", # LM2, LPM, MM, MPM, UM1, UM2
-   # r"Z:\JTM\Wingtra\WingtraPilotProjects\070923 Trip", # LM2, LPM, MM, MPM, UM1, UM2
+    #r"Z:\ATD\Drone Data Processing\Drone Images\East_Troublesome\Flights\102123", # LM2, LPM, MM, MPM, UM1, UM2
+    #r"Z:\JTM\Wingtra\WingtraPilotProjects\070923 Trip", # LM2, LPM, MM, MPM, UM1, UM2
     #r"Z:\JTM\Wingtra\WingtraPilotProjects\053123 Trip", # Don't Use 
     #r"Z:\ATD\Drone Data Processing\Drone Images\East_Troublesome\Flights\10__22" # Re-PPK processed 
-    r"Z:\JTM\Wingtra\WingtraPilotProjects\100622 Trip", # LM2, LPM, MM, MPM
+    #r"Z:\JTM\Wingtra\WingtraPilotProjects\100622 Trip", # LM2, LPM, MM, MPM
     #r"Z:\JTM\Wingtra\WingtraPilotProjects\090822 Trip" #  UM1, UM2
-    r"Z:\JTM\Wingtra\WingtraPilotProjects\090122 Trip", # MM, MPM, LPM
-    r"Z:\JTM\Wingtra\WingtraPilotProjects\081222 Trip" # LM2, LPM
+    #r"Z:\JTM\Wingtra\WingtraPilotProjects\090122 Trip", # MM, MPM, LPM
+    #r"Z:\JTM\Wingtra\WingtraPilotProjects\081222 Trip" # LM2, LPM
     #r"Z:\JTM\Wingtra\WingtraPilotProjects\071922 Trip" # UM1, UM2
+    r"Z:\ATD\Drone Data Processing\Drone Images\Bennett\Spring2023_Wingtra\Wingtra Photos\05222023\WingtraPilotProjects",
+    
                            ]         # list of photo folders to process
 defaults.psx_dict ={
-    "LPM": r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\LPM_10_2023\LPM_2022_Surveys_One_Checked.psx" #for setup, {user tag: psx project filepath}
+    "ME": r"Z:\ATD\Drone Data Processing\Metashape Processing\Bennett\ME\ME_06012023.psx" #for setup, {user tag: psx project filepath}
 }
 
 defaults.geoid = r"Z:\JTM\Metashape\us_noaa_g2018u0.tif"              # path to geoid file
