@@ -132,7 +132,7 @@ defaults.flight_folders = [
     
                            ]         # list of photo folders to process
 defaults.psx_dict ={
-    "ME": r"Z:\ATD\Drone Data Processing\Metashape Processing\Bennett\ME\ME_06012023.psx" #for setup, {user tag: psx project filepath}
+   # "ME": r"Z:\ATD\Drone Data Processing\Metashape Processing\Bennett\ME\ME_06012023.psx" #for setup, {user tag: psx project filepath}
 }
 
 defaults.geoid = r"Z:\JTM\Metashape\us_noaa_g2018u0.tif"              # path to geoid file
@@ -216,6 +216,7 @@ defaults.proclogname = 'default.txt'
 defaults.ru_cutoff = 0.50           # percentage of points removed in single RU iteration [0.50]
 defaults.pa_cutoff = 0.50           # percentage of points removed in single PA iteration [0.50]
 defaults.re_cutoff = 0.10           # percentage of points removed in single RE iteration [0.10]
+defaults.re_cutoff_R2 = 0.05
 # Changing these values may result in infinite loops
 defaults.ru_increment = 1           # increment by which RU filter advanced when finding RU level to select ru_cutoff percentage [1]
 defaults.pa_increment = 0.2         # increment by which PA filter advanced when finding PA level to select pa_cutoff percentage [0.2]
@@ -553,10 +554,6 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
         metadata = chunk.meta
         SEUW = float(metadata['OptimizeCameras/sigma0'])
 
-        # SEUW should be getting closer to 1 every iteration, if it's not, break
-        #if math.fabs(1 - SEUW) > math.fabs(1 - SEUWlast): 
-         #   break  
-        
         # define threshold variables
         points = chunk.tie_points.points
         refilt = Metashape.TiePoints.Filter()
@@ -671,6 +668,7 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
 
     #======================================USGS Step 14 - 18==============================================================
     threshold_re_R2 = 0.05
+    re_cutoff_R2 = parg.re_cutoff_R2
     if 'log' in kwargs:
         # check that filename defined
         if 'proclog' in kwargs:
@@ -678,7 +676,7 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
             with open(kwargs['proclog'], 'a') as f:
                 f.write(f"\nSecond round of optimizations will begin with a tie point accuracy of {RE_round2_tie_point_acc}, which will be lowered dynamically if SEUW deviates from 1.\n")
                 f.write("Optimal SEUW value is 1, and it should be approaching closer to 1 after every iteration.\n")
-                f.write(f"the RE value will be lowered to {threshold_re_R2:.2f} and {re_cutoff * 100:.2f}% of tie points will be removed each iteration.\n")
+                f.write(f"the RE value will be lowered to {threshold_re_R2:.2f} and {re_cutoff_R2 * 100:.2f}% of tie points will be removed each iteration.\n")
                 f.write(f"A max of {round2_max_optimizations} iterations will be performed in the second round.\n")
     noptimized_round2 = 1
     ninc_reduced = 0
@@ -717,7 +715,7 @@ def reprojection_error(chunk, re_filt_level_param, re_cutoff, re_increment, cam_
             break
         npoints = len(points)
         
-        while nselected * (1 / re_cutoff) > npoints:
+        while nselected * (1 / re_cutoff_R2) > npoints:
             print("RE threshold ", threshold_re, "selected ", nselected, "/", npoints, "(",
                   round(nselected / npoints * 100, 4), " %) of  points. Adjusting")
             threshold_re = threshold_re + re_increment
