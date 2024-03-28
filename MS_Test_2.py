@@ -1,3 +1,4 @@
+import Metashape
 import os
 import glob
 
@@ -17,7 +18,6 @@ def find_folders_with_tag(basepath, user_tag):
 
     return matched_folders
 
-
 def find_jpgs_in_output_folders(folders):
     jpg_files = []
     
@@ -34,7 +34,61 @@ def find_jpgs_in_output_folders(folders):
 
     return jpg_files
 
-basepath = r'Z:\ATD\Drone Data Processing\Drone Images\Bennett\Spring2023_Wingtra\Wingtra Photos'
-user_tag = 'ME'
-folders = find_folders_with_tag(basepath, user_tag)
-jpg_files = find_jpgs_in_output_folders(folders)
+def setup_psx(user_tag, flight_folder_dict, psx):
+    
+    #Open the Metashape document
+    
+    doc = Metashape.app.document
+    doc.open(psx)
+    group_dict = {}
+    chunk = doc.chunk
+    if chunk.label == "Raw_Photos":
+        chunk = doc.chunk
+    else:
+        chunk = chunk.copy()
+        chunk.label = "Raw_Photos"
+        
+    for group_info, flight_folder in flight_folder_dict.items():
+        group_name = group_info[0]
+        if user_tag not in group_info[1]:
+            continue
+        folders = find_folders_with_tag(flight_folder, user_tag)
+        photos_in_folder = find_jpgs_in_output_folders(folders)
+        if group_name not in group_dict:
+            if not group_dict:
+                group_dict[group_name] = 0
+            else:
+                group_dict[group_name] = max(group_dict.values()) + 1
+            current_group = chunk.addCameraGroup()
+            current_group.label = group_name
+            
+  
+        # Here you might want to add photos to the Metashape chunk
+        print(f"Adding photos from {flight_folder} with tag {user_tag} to group {group_name}")
+        print(f"Current group: {group_dict[group_name]}")
+        photos_in_chunk = [photo.label for photo in chunk.cameras]
+        photos_to_load = [photo for photo in photos_in_folder if photo not in photos_in_chunk]
+        chunk.addPhotos(photos_to_load, group=group_dict[group_name]) if photos_to_load else None
+        doc.save()
+    return chunk
+                        
+
+def main():
+
+    psx_dict ={
+    "LM2" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\LM2_10_2023\LM2_2023.psx",
+    #"UM2" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\UM2_10_2023\UM2_2023.psx",
+    }
+    flight_folder_dict = {
+            ('102123', ('LM2', 'LPM', 'MM', 'MPM', 'UM1', 'UM2')) : r"Z:\ATD\temp\070922 Trip",
+            ('070923', ('LM2', 'LPM', 'MM', 'MPM', 'UM1', 'UM2')) : r"Z:\ATD\temp\070923 Trip", # LM2, LPM, MM, MPM, UM1, UM2
+    }
+    
+    for user_tag, psx in psx_dict.items():
+        setup_psx(user_tag, flight_folder_dict, psx)
+        
+if __name__ == "__main__":
+    main()
+
+
+
