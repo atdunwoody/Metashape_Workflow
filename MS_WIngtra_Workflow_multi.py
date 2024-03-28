@@ -119,20 +119,24 @@ defaults.initial_chunk = 'active'    # Name of first chunk to operate on ('activ
 defaults.export_dir = None        # path to input directory where all psx folders will be processed
 defaults.user_tag = 'ME'             # list of user tags to process
 defaults.flight_folders = [
-    #r"Z:\ATD\Drone Data Processing\Drone Images\East_Troublesome\Flights\102123", # LM2, LPM, MM, MPM, UM1, UM2
-    #r"Z:\JTM\Wingtra\WingtraPilotProjects\070923 Trip", # LM2, LPM, MM, MPM, UM1, UM2
+    r"Z:\ATD\Drone Data Processing\Drone Images\East_Troublesome\Flights\102123", # LM2, LPM, MM, MPM, UM1, UM2
+    r"Z:\JTM\Wingtra\WingtraPilotProjects\070923 Trip", # LM2, LPM, MM, MPM, UM1, UM2
     #r"Z:\JTM\Wingtra\WingtraPilotProjects\053123 Trip", # Don't Use 
-    #r"Z:\ATD\Drone Data Processing\Drone Images\East_Troublesome\Flights\10__22" # Re-PPK processed 
-    #r"Z:\JTM\Wingtra\WingtraPilotProjects\100622 Trip", # LM2, LPM, MM, MPM
-    #r"Z:\JTM\Wingtra\WingtraPilotProjects\090822 Trip" #  UM1, UM2
-    #r"Z:\JTM\Wingtra\WingtraPilotProjects\090122 Trip", # MM, MPM, LPM
-    #r"Z:\JTM\Wingtra\WingtraPilotProjects\081222 Trip" # LM2, LPM
-    #r"Z:\JTM\Wingtra\WingtraPilotProjects\071922 Trip" # UM1, UM2
-    r"Z:\ATD\Drone Data Processing\Drone Images\Bennett\Spring2023_Wingtra\Wingtra Photos\05222023\WingtraPilotProjects",
+    r"Z:\ATD\Drone Data Processing\Drone Images\East_Troublesome\Flights\10__22" # Re-PPK processed 
+    r"Z:\JTM\Wingtra\WingtraPilotProjects\100622 Trip", # LM2, LPM, MM, MPM
+    r"Z:\JTM\Wingtra\WingtraPilotProjects\090822 Trip" #  UM1, UM2
+    r"Z:\JTM\Wingtra\WingtraPilotProjects\090122 Trip", # MM, MPM, LPM
+    r"Z:\JTM\Wingtra\WingtraPilotProjects\081222 Trip" # LM2, LPM
+    r"Z:\JTM\Wingtra\WingtraPilotProjects\071922 Trip" # UM1, UM2
+    #r"Z:\ATD\Drone Data Processing\Drone Images\Bennett\Spring2023_Wingtra\Wingtra Photos\05222023\WingtraPilotProjects",
     
                            ]         # list of photo folders to process
+# for setup, {user tag: psx project filepath}
 defaults.psx_dict ={
-   # "ME": r"Z:\ATD\Drone Data Processing\Metashape Processing\Bennett\ME\ME_06012023.psx" #for setup, {user tag: psx project filepath}
+    #"LM2" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\LM2_10_2023\LM2_2023.psx",
+    "MPM" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MPM_10_2023\MPM_2023.psx",
+    "UM1" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\UM1_10_2023\UM1_2023.psx",
+    "UM2" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\UM2_10_2023\UM2_2023.psx",
 }
 
 defaults.geoid = r"Z:\JTM\Metashape\us_noaa_g2018u0.tif"              # path to geoid file
@@ -216,7 +220,7 @@ defaults.proclogname = 'default.txt'
 defaults.ru_cutoff = 0.50           # percentage of points removed in single RU iteration [0.50]
 defaults.pa_cutoff = 0.50           # percentage of points removed in single PA iteration [0.50]
 defaults.re_cutoff = 0.10           # percentage of points removed in single RE iteration [0.10]
-defaults.re_cutoff_R2 = 0.05
+defaults.re_cutoff_R2 = 0.10        # percentage of points removed in single RE iteration in second reound [0.10]
 # Changing these values may result in infinite loops
 defaults.ru_increment = 1           # increment by which RU filter advanced when finding RU level to select ru_cutoff percentage [1]
 defaults.pa_increment = 0.2         # increment by which PA filter advanced when finding PA level to select pa_cutoff percentage [0.2]
@@ -1207,7 +1211,7 @@ def buildDEMOrtho(input_chunk, doc, ortho_res = None, dem_res = None, interpolat
         chunk.buildOrthomosaic(
             surface_data=Metashape.DataSource.ElevationData,
             blending_mode=Metashape.MosaicBlending,
-            fill_holes=False,
+            fill_holes= True,
             ghosting_filter=False,
             cull_faces=False,
             refine_seamlines=False,
@@ -1217,7 +1221,7 @@ def buildDEMOrtho(input_chunk, doc, ortho_res = None, dem_res = None, interpolat
         chunk.buildOrthomosaic(
             surface_data=Metashape.DataSource.ElevationData,
             blending_mode=Metashape.MosaicBlending,
-            fill_holes=False,
+            fill_holes=True,
             ghosting_filter=False,
             cull_faces=False,
             refine_seamlines=False,
@@ -1416,6 +1420,7 @@ def main(parg, doc):
     for user_tag, psx_file in parg.psx_dict.items():
         # Open the project file
         processing_start = datetime.now()
+        parg.proclogname = os.path.splitext(psx_file)[0] + "_ProcessingLog.txt"
         if parg.log:
             with open(parg.proclogname, 'a') as f:
                 f.write("\n")
@@ -1661,6 +1666,8 @@ def main(parg, doc):
                                     f.write("Fltered by Confidence Level: " + str(maxconf) + "\n")
                                     f.write("Processing time: " + str(datetime.now() - cloud_start) + "\n")
                         print("-------------------------------FILTER DENSE CLOUD---------------------------------------")
+                        if copied_chunk.label.endswith("_PCFiltered"):
+                            continue
                         filtered_chunk = filter_point_cloud(copied_chunk, maxconf, doc)
                 except Exception as e:
                     print("Error processing " + current_chunk)
