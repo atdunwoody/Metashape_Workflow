@@ -134,7 +134,7 @@ defaults.flight_folders = [
 # for setup, {user tag: psx project filepath}
 defaults.psx_dict ={
     #"LM2" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\LM2_10_2023\LM2_2023.psx",
-    "MPM" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MPM_10_2023\MPM_2023.psx",
+    #"MPM" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MPM_10_2023\MPM_2023.psx",
     "UM1" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\UM1_10_2023\UM1_2023.psx",
     "UM2" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\UM2_10_2023\UM2_2023.psx",
 }
@@ -1665,10 +1665,9 @@ def main(parg, doc):
                                     f.write("Point Cloud Filter: Mild \n")
                                     f.write("Fltered by Confidence Level: " + str(maxconf) + "\n")
                                     f.write("Processing time: " + str(datetime.now() - cloud_start) + "\n")
-                        print("-------------------------------FILTER DENSE CLOUD---------------------------------------")
-                        if copied_chunk.label.endswith("_PCFiltered"):
-                            continue
-                        filtered_chunk = filter_point_cloud(copied_chunk, maxconf, doc)
+                            print("-------------------------------FILTER DENSE CLOUD---------------------------------------")
+
+                            filtered_chunk = filter_point_cloud(copied_chunk, maxconf, doc)
                 except Exception as e:
                     print("Error processing " + current_chunk)
                     print(e)
