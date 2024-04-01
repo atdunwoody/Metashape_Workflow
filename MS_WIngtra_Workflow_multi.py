@@ -134,9 +134,9 @@ defaults.flight_folders = [
 # for setup, {user tag: psx project filepath}
 defaults.psx_dict ={
     #"LM2" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\LM2_10_2023\LM2_2023.psx",
-    #"MPM" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MPM_10_2023\MPM_2023.psx",
-    "UM1" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\UM1_10_2023\UM1_2023.psx",
-    "UM2" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\UM2_10_2023\UM2_2023.psx",
+    "MPM" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MPM_10_2023\MPM_2023_090122_REMOVED.psx",
+    #"UM1" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\UM1_10_2023\UM1_2023.psx",
+    #"UM2" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\UM2_10_2023\UM2_2023.psx",
 }
 
 defaults.geoid = r"Z:\JTM\Metashape\us_noaa_g2018u0.tif"              # path to geoid file
@@ -1637,10 +1637,11 @@ def main(parg, doc):
             print("Building Point Clouds")
             chunk_label_list = [chunk.label for chunk in doc.chunks]
             post_error_chunk = f"Raw_Photos_Align_RU{parg.ru_filt_level}_PA{parg.pa_filt_level}_RE{parg.re_filt_level}_TPA{parg.re_round2_TPA}"
-            pc_chunk = f"{post_error_chunk}_PCFiltered"
             post_error_chunk_list = [chunk for chunk in chunk_label_list if chunk.endswith(post_error_chunk)]
             print("Chunks to process: " + str(post_error_chunk_list))
             if len(post_error_chunk_list) == 0:
+                print("WARNING: No chunks found with the suffix " + post_error_chunk )
+                print(f"Processing current chunk that may not have gone through gradual selection: {chunk.label}")
                 post_error_chunk_list = [chunk.label]
             #Get the chunk names and create a counter for progress updates
             for current_chunk, i in zip(post_error_chunk_list, range(len(post_error_chunk_list))):
@@ -1654,7 +1655,6 @@ def main(parg, doc):
                         chunk = activate_chunk(doc, copied_chunk)
                         if len(chunk.depth_maps_sets) == 0: #Check that a point cloud doesnt already exist
                             print("-------------------------------BUILD DENSE CLOUD---------------------------------------\n")
-
                             cloud_start = datetime.now()
                             buildDenseCloud(copied_chunk, doc)
                             if parg.log:
@@ -1667,7 +1667,12 @@ def main(parg, doc):
                                     f.write("Processing time: " + str(datetime.now() - cloud_start) + "\n")
                             print("-------------------------------FILTER DENSE CLOUD---------------------------------------")
 
-                            filtered_chunk = filter_point_cloud(copied_chunk, maxconf, doc)
+                        pc_filtered_chunk = copied_chunk + '_PCFiltered'
+                        if pc_filtered_chunk == copied_chunk:
+                            print("Point cloud already filtered, skipping....")
+                            continue
+                        filtered_chunk = filter_point_cloud(copied_chunk, maxconf, doc)
+                        
                 except Exception as e:
                     print("Error processing " + current_chunk)
                     print(e)
