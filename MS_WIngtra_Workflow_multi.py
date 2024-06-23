@@ -134,14 +134,14 @@ defaults.flight_folders = [
 # for setup, {user tag: psx project filepath}
 defaults.psx_dict ={
     #"LM2" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\LM2_10_2023\LM2_2023.psx",
-    "MPM" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MPM_10_2023\MPM_2023_090122_REMOVED.psx",
+    #"MPM" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MPM_10_2023\MPM_2023_090122_REMOVED.psx",
     #"UM1" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\UM1_10_2023\UM1_2023.psx",
     #"UM2" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\UM2_10_2023\UM2_2023.psx",
 }
 
 defaults.geoid = r"Z:\JTM\Metashape\us_noaa_g2018u0.tif"              # path to geoid file
-defaults.dem_resolution = 0
-defaults.ortho_resolution = 0
+defaults.dem_resolution = 0.04
+defaults.ortho_resolution = 0.02
 # ------------Alignment defaults -------------------------------------------------------
 defaults.setup = False              # run MS_PSX_Setup.py
 defaults.pcbuild = False            # run MS_Build_PointCloud.py
@@ -154,19 +154,19 @@ defaults.alignment_params = {
         "reference_preselection": True, #Default is True, reference preselection enabled
         #Commented out below because it is already set to default parameter and Python can't pickle the Metashape.ReferencePreselectionSource object
         #"reference_preselection_mode": Metashape.ReferencePreselectionSource, # Source uses reference coordinates
-        "filter_mask": False,
-        "mask_tiepoints": True,
-        "filter_stationary_points": True,
-        "keypoint_limit": 60000, #Default = 40000, 60000 for high quality images 
+        "filter_mask": False, #Default is True, filter mask
+        "mask_tiepoints": True, #Default is True, mask tiepoints
+        "filter_stationary_points": True, #Default is True, filter stationary points
+        "keypoint_limit": 60000, #Default = 60000, 40000 for low quality images 
         "keypoint_limit_per_mpx": 1000,
-        "tiepoint_limit": 10000, #Default = 4000, 10000 for high quality images
-        "keep_keypoints": False,
-        "guided_matching": True,
-        "reset_matches": True,
-        "subdivide_task": True,
-        "workitem_size_cameras": 20,
-        "workitem_size_pairs": 80,
-        "max_workgroup_size": 100
+        "tiepoint_limit": 0, #Default = 10000, 10000 for high quality images, 4000 for low quality images, 0 for no limit
+        "keep_keypoints": False, #Default is True, keep keypoints
+        "guided_matching": True, #Default is True, guided image matching
+        "reset_matches": True, #Default is True, reset matches
+        "subdivide_task": True, #Default is True, subdivide task
+        "workitem_size_cameras": 20, #Default is 20, workitem size cameras
+        "workitem_size_pairs": 80, #Default is 80, workitem size pairs
+        "max_workgroup_size": 100 #Default is 100, max workgroup size
     }
 
 defaults.cam_opt_param = {
@@ -1092,11 +1092,7 @@ def copy_chunks_for_cloud(post_error_chunk, doc):
     chunk = doc.chunk
     #Re-enable all cameras in the chunk (e.g. select or "check" cameras in reference pane) 
     #This is in case some cameras were disabled before alignment 
-    for camera in chunk.cameras:
-        if camera.reference.location:
-            camera.reference.location_enabled = True
-        if camera.reference.rotation:
-            camera.reference.rotation_enabled = True
+
     copied_list = []
     #Create copies of the chunk for each camera group (different flight dates separated for building dense cloiud and rasters)
     print("Camera groups: " + str(chunk.camera_groups))
@@ -1129,6 +1125,12 @@ def copy_chunks_for_cloud(post_error_chunk, doc):
         for camera_group in new_chunk.camera_groups:
             if camera_group.label != group.label:
                 new_chunk.remove(camera_group)
+        #Activate all cameras in the new chunk
+        for camera in new_chunk.cameras:
+            if camera.reference.location:
+                camera.reference.location_enabled = True
+            if camera.reference.rotation:
+                camera.reference.rotation_enabled = True
     print("Copied chunks: " + str(copied_list))
     return copied_list
     
@@ -1435,7 +1437,7 @@ def main(parg, doc):
         # Get the active chunk
         doc = Metashape.app.document
         if parg.setup==False and parg.align==False and parg.ru==False and parg.pa==False and parg.re==False and parg.pcbuild==False and parg.build==False:
-            parg.setup = True
+            parg.setup = False
             parg.align = True
             parg.ru = True
             parg.pa = True
