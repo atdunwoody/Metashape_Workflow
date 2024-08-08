@@ -79,6 +79,10 @@ defaults:
                camera optimization lens params adjusted when RE < 1 pixel
                adjusted camera optimization lens param: f, cx, cy, k1, k2, k3, k4, b1, b2, p1, p2, p3, p4
     
+    -pcbuild   build dense cloud
+    
+    -build     build DEM, Ortho, and DSM
+    
     -log       Output processing log file name: XXXXX_ProcessingLog.txt (XXXXX = Metashape project name)
 
 @authors: 
@@ -140,8 +144,8 @@ defaults.psx_dict ={
 }
 
 defaults.geoid = r"Z:\JTM\Metashape\us_noaa_g2018u0.tif"              # path to geoid file
-defaults.dem_resolution = 0.04
-defaults.ortho_resolution = 0.02
+defaults.dem_resolution = 0.065
+defaults.ortho_resolution = 0.08
 # ------------Alignment defaults -------------------------------------------------------
 defaults.setup = False              # run MS_PSX_Setup.py
 defaults.pcbuild = False            # run MS_Build_PointCloud.py
@@ -149,21 +153,21 @@ defaults.build = False             # run MS_Build_Products.py
 defaults.align = False              # run image alignment
 
 defaults.alignment_params = {
-        "downscale": 1, # 0 = Highest, 1 = High, 2 = Medium, 3 = Low, 4 = Lowest
+        "downscale": 1, # e.g. Accuracy, 0 = Highest, 1 = High, 2 = Medium, 3 = Low, 4 = Lowest
         "generic_preselection": True, # Default is True, speeds up alignment
-        "reference_preselection": True, #Default is True, reference preselection enabled
+        "reference_preselection": True, # Default is True, reference preselection enabled
         #Commented out below because it is already set to default parameter and Python can't pickle the Metashape.ReferencePreselectionSource object
         #"reference_preselection_mode": Metashape.ReferencePreselectionSource, # Source uses reference coordinates
-        "filter_mask": False, #Default is True, filter mask
-        "mask_tiepoints": True, #Default is True, mask tiepoints
-        "filter_stationary_points": True, #Default is True, filter stationary points
-        "keypoint_limit": 60000, #Default = 60000, 40000 for low quality images 
-        "keypoint_limit_per_mpx": 1000,
-        "tiepoint_limit": 0, #Default = 10000, 10000 for high quality images, 4000 for low quality images, 0 for no limit
-        "keep_keypoints": False, #Default is True, keep keypoints
-        "guided_matching": True, #Default is True, guided image matching
-        "reset_matches": True, #Default is True, reset matches
-        "subdivide_task": True, #Default is True, subdivide task
+        "filter_mask": False, # Default is True, filter mask
+        "mask_tiepoints": True, # Default is True, mask tiepoints
+        "filter_stationary_points": True, # Default is True, filter stationary points
+        "keypoint_limit": 40000, #Default = 60000, 40000 for low quality images 
+        "keypoint_limit_per_mpx": 1000, # Default = 1000
+        "tiepoint_limit": 4000, #Default = 10000, 10000 for high quality images, 4000 for low quality images, 0 for no limit
+        "keep_keypoints": False, # Default is True, keep keypoints
+        "guided_matching": False, # Default is True, (False for USGS workflow)
+        "reset_matches": True, # Default is True, reset matches
+        "subdivide_task": True, # Default is True, subdivide task
         "workitem_size_cameras": 20, #Default is 20, workitem size cameras
         "workitem_size_pairs": 80, #Default is 80, workitem size pairs
         "max_workgroup_size": 100 #Default is 100, max workgroup size
@@ -201,8 +205,8 @@ defaults.pa_filt_level = 3          # pa gradual selection filter level (default
 # ------------Reprojection Error (re) defaults -----------------------------------------
 defaults.re = False                 # run re gradual selection iterations
 defaults.re_filt_level = 0.3        # re gradual selection filter level (default=0.3, optimum value: [0.3])
-defaults.re_round1_opt = 30          # max number of camera optimization iterations in round 1 (default=5)
-defaults.re_round2_opt = 12          # max number of camera optimization iterations in round 2 (default=5)
+defaults.re_round1_opt = 5          # max number of camera optimization iterations in round 1 (default=5)
+defaults.re_round2_opt = 5          # max number of camera optimization iterations in round 2 (default=5)
 defaults.re_round2_TPA = 0.1
 defaults.re_RMSE_goal = 0.18
 
