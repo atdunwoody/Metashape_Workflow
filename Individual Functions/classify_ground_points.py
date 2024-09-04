@@ -219,6 +219,9 @@ def main():
         chunk = doc.chunks[original_chunk_index]
         print(f"Compacting points in {chunk.label}")
         chunk.point_cloud.compactPoints()
+        buildDEMOrtho(chunk.label, doc, buildOrtho = True)
+        exportDEMOrtho(chunk.label, path_to_save_dem=os.path.join(export_dir, f"DEM_{original_chunk_index}_{chunk.label}.tif"), 
+                       path_to_save_ortho = os.path.join(export_dir, f"Ortho_{original_chunk_index}_{chunk.label}.tif"))
     for original_chunk_index in original_chunk_list:
         # Define parameter ranges
         max_angle_range = [15, 35]
@@ -261,9 +264,8 @@ def main():
                                 log_file.write(f"Classified in {new_chunk.label} with params: {params}\n")
 
                             export_dem_path = os.path.join(export_dir, f"DEM_{new_chunk.label}.tif")
-                            export_ortho_path = os.path.join(export_dir, f"Ortho_{new_chunk.label}.tif")
                             buildDEMOrtho(new_chunk.label, doc, buildOrtho = False)
-                            exportDEMOrtho(new_chunk.label, path_to_save_dem=export_dem_path, path_to_save_ortho = export_ortho_path)
+                            exportDEMOrtho(new_chunk.label, path_to_save_dem=export_dem_path)
                             # Save the project after classification
         doc.save()
 
