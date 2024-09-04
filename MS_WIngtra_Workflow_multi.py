@@ -1273,7 +1273,7 @@ def exportDEMOrtho(input_chunk, path_to_save_dem=None, path_to_save_ortho = None
     chunk = doc.chunk
     cwd = os.getcwd()
     if geoidPath is None:
-        geoidPath  = cwd + r"\us_noaa_g2018u0.tif"
+        geoidPath  = r"Z:\JTM\Metashape\us_noaa_g2018u0.tif"
     print('Setting Geoid path:' + geoidPath)
     Metashape.CoordinateSystem.addGeoid(geoidPath)
     #EPSG for NAD83(2011) / UTM zone 13N = 6342
