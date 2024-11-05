@@ -139,8 +139,8 @@ defaults.flight_folders = [
 defaults.psx_dict ={
     #"LM2" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\LM2_10_2023\LM2_2023.psx",
     #"MPM" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\MPM_10_2023\MPM_2023_090122_REMOVED.psx",
-    #"UM1" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\UM1_10_2023\UM1_2023.psx",
-    #"UM2" : r"Z:\ATD\Drone Data Processing\Metashape Processing\East_Troublesome\UM2_10_2023\UM2_2023.psx",
+    "UM1" : r"Y:\ATD\Drone Data Processing\Metashape_Processing\East_Troublesome\072023 - 092022\UM1_072023-092022.psx",
+    "UM2" : r"Y:\ATD\Drone Data Processing\Metashape_Processing\East_Troublesome\072023 - 092022\UM2_072023-092022.psx",
 }
 
 defaults.geoid = r"Z:\JTM\Metashape\us_noaa_g2018u0.tif"              # path to geoid file
